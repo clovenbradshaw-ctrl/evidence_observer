@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Workbench Tests</title>
+  <style>
+    body { font-family: monospace; background: #0f172a; color: #f1f5f9; padding: 24px; }
+    .pass { color: #16a34a; }
+    .fail { color: #dc2626; }
+    h2 { color: #38bdf8; }
+    pre { background: #1e293b; padding: 12px; border-radius: 8px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>∅ → ⊡ → △ — Analytical Workbench Tests</h1>
+  <pre id="output">Running tests...</pre>
+
+  <script src="../lib/sql-wasm.js"></script>
+  <script type="module">
+    // Redirect console to output
+    const output = document.getElementById('output');
+    const _log = console.log;
+    const _error = console.error;
+
+    console.log = (...args) => {
+      _log(...args);
+      const line = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+      const span = document.createElement('span');
+      span.className = line.includes('✓') ? 'pass' : '';
+      span.textContent = line + '\n';
+      output.appendChild(span);
+    };
+
+    console.error = (...args) => {
+      _error(...args);
+      const line = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+      const span = document.createElement('span');
+      span.className = 'fail';
+      span.textContent = line + '\n';
+      output.appendChild(span);
+    };
+
+    output.textContent = '';
+
+    // Run tests
+    try {
+      await import('./test_vault.js');
+    } catch (e) {
+      console.error('Test error:', e.message);
+      console.error(e.stack);
+    }
+  </script>
+</body>
+</html>

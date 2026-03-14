@@ -1,0 +1,274 @@
+/**
+ * Vault View — Given-Log Browser
+ * INS(△) anchors displayed with immutable visual treatment.
+ * Upload, inspect, and review Given data sources.
+ */
+
+import { getAllSources, getSource, getAnchors } from '../models/given_log.js';
+import { ins_ingest, getSourceData } from '../given/service.js';
+import { formatOperator, NullState, OPERATORS } from '../models/operators.js';
+import { renderDataTable, renderDropzone, renderModal, html, toast } from './components.js';
+import { nul_audit } from '../given/nul.js';
+
+/**
+ * Render the vault view.
+ */
+export function renderVaultView(container) {
+  container.innerHTML = '';
+
+  const view = html`
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="font-size: 1.2rem;">
+          <span style="color: var(--given-border);">${OPERATORS.INS.glyph}</span>
+          Given-Log — Existence Domain
+        </h2>
+        <span class="given-badge">IMMUTABLE</span>
+      </div>
+    </div>
+  `;
+
+  // File upload dropzone
+  const dropzone = renderDropzone(async (file) => {
+    try {
+      toast('INS(△) Ingesting...', 'info');
+      const result = await ins_ingest(file);
+
+      if (result.status === 'duplicate') {
+        toast(`SIG(⊡): Duplicate — file already in Given-Log`, 'error');
+        return;
+      }
+
+      toast(`INS(△) Anchored: ${result.rowCount} rows, ${result.columnCount} columns`, 'success');
+
+      // Show schema review modal
+      _showSchemaReview(result);
+
+      // Re-render source list
+      _renderSourceList(sourceListContainer);
+    } catch (err) {
+      toast(`INS(△) Failed: ${err.message}`, 'error');
+      console.error(err);
+    }
+  });
+  view.appendChild(dropzone);
+
+  // Source list
+  const sourceListContainer = document.createElement('div');
+  sourceListContainer.style.marginTop = '24px';
+  _renderSourceList(sourceListContainer);
+  view.appendChild(sourceListContainer);
+
+  container.appendChild(view);
+}
+
+/**
+ * Render the list of Given-Log sources.
+ */
+function _renderSourceList(container) {
+  container.innerHTML = '';
+
+  const sources = getAllSources();
+
+  if (sources.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="glyph">∅</div>
+        <p>No sources in the Given-Log yet.<br>
+        Upload a CSV or JSON file to begin.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const heading = html`
+    <h3 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-secondary);">
+      ${sources.length} source${sources.length !== 1 ? 's' : ''} anchored
+    </h3>
+  `;
+  container.appendChild(heading);
+
+  for (const source of sources) {
+    const card = _renderSourceCard(source);
+    container.appendChild(card);
+  }
+}
+
+/**
+ * Render a single source card.
+ */
+function _renderSourceCard(source) {
+  const schema = source.schema_json ? JSON.parse(source.schema_json) : [];
+  const provenance = source.provenance_json ? JSON.parse(source.provenance_json) : {};
+
+  const card = html`
+    <div class="card given-row" style="cursor: pointer;">
+      <div class="card-header">
+        <span class="op-glyph existence">${OPERATORS.INS.glyph}</span>
+        <div style="flex: 1;">
+          <div class="card-title">${source.filename}</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            ${source.row_count} rows × ${source.column_count} columns
+            · SHA-256: ${source.sha256_hash.substring(0, 12)}…
+            · ${new Date(source.ingested_at).toLocaleString()}
+          </div>
+        </div>
+        <span class="given-badge">Given</span>
+      </div>
+    </div>
+  `;
+
+  card.addEventListener('click', () => _showSourceDetail(source));
+  return card;
+}
+
+/**
+ * Show detailed view of a source.
+ */
+async function _showSourceDetail(source) {
+  const content = document.createElement('div');
+
+  // Metadata section
+  const meta = html`
+    <div style="margin-bottom: 16px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem;">
+        <div><strong>Filename:</strong> ${source.filename}</div>
+        <div><strong>Method:</strong> ${source.method || 'manual_upload'}</div>
+        <div><strong>SHA-256:</strong> <code style="font-size: 0.75rem;">${source.sha256_hash}</code></div>
+        <div><strong>Ingested:</strong> ${new Date(source.ingested_at).toLocaleString()}</div>
+        <div><strong>Rows:</strong> ${source.row_count}</div>
+        <div><strong>Columns:</strong> ${source.column_count}</div>
+      </div>
+      ${source.derived_from ? `<div style="margin-top: 8px; color: var(--meant-border);">Derived from: ${source.derived_from}</div>` : ''}
+    </div>
+  `;
+  content.appendChild(meta);
+
+  // Schema section
+  const schema = source.schema_json ? JSON.parse(source.schema_json) : [];
+  if (schema.length > 0) {
+    const schemaSection = html`<div style="margin-bottom: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">SIG(⊡) Schema</h4></div>`;
+    const schemaTable = renderDataTable(
+      schema.map(s => ({
+        Column: s.name,
+        'Inferred Type': s.inferredType,
+        Confidence: `${Math.round(s.confidence * 100)}%`,
+        Override: s.override || '—',
+        Justification: s.overrideJustification || '—'
+      })),
+      ['Column', 'Inferred Type', 'Confidence', 'Override', 'Justification']
+    );
+    schemaSection.appendChild(schemaTable);
+    content.appendChild(schemaSection);
+  }
+
+  // NUL(∅) Audit section
+  const provenance = source.provenance_json ? JSON.parse(source.provenance_json) : {};
+  if (provenance.nullAudit) {
+    const nullSection = html`<div style="margin-bottom: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">NUL(∅) Null Audit</h4></div>`;
+    const nullRows = Object.entries(provenance.nullAudit).map(([col, counts]) => ({
+      Column: col,
+      Populated: counts.populated,
+      'CLEARED (∅)': counts.CLEARED || 0,
+      'UNKNOWN (∅)': counts.UNKNOWN || 0,
+      'NEVER_SET (∅)': counts.NEVER_SET || 0
+    }));
+    const nullTable = renderDataTable(
+      nullRows,
+      ['Column', 'Populated', 'CLEARED (∅)', 'UNKNOWN (∅)', 'NEVER_SET (∅)']
+    );
+    nullSection.appendChild(nullTable);
+    content.appendChild(nullSection);
+  }
+
+  // Data preview
+  const dataSection = html`<div><h4 style="font-size: 0.9rem; margin-bottom: 8px;">INS(△) Anchored Records (preview)</h4></div>`;
+
+  try {
+    const data = JSON.parse(source.data_json);
+    const rows = Array.isArray(data) ? data : [];
+    const previewRows = rows.slice(0, 50);
+    const headers = schema.map(s => s.name);
+
+    if (previewRows.length > 0 && headers.length > 0) {
+      // Build null states map for display
+      const nullStatesMap = {};
+      const anchors = getAnchors(source.id);
+      for (const anchor of anchors.slice(0, 50)) {
+        if (anchor.null_states_json) {
+          nullStatesMap[anchor.row_index] = JSON.parse(anchor.null_states_json);
+        }
+      }
+
+      const table = renderDataTable(previewRows, headers, { nullStates: nullStatesMap });
+      dataSection.appendChild(table);
+
+      if (rows.length > 50) {
+        const more = html`<div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-muted);">Showing 50 of ${rows.length} rows</div>`;
+        dataSection.appendChild(more);
+      }
+    }
+  } catch (e) {
+    dataSection.appendChild(html`<div style="color: var(--text-muted);">Data stored in IndexedDB (large dataset)</div>`);
+  }
+
+  content.appendChild(dataSection);
+
+  renderModal(`${OPERATORS.INS.glyph} ${source.filename}`, content, [
+    { label: 'Close', onClick: () => {} }
+  ]);
+}
+
+/**
+ * Show schema review modal after ingestion.
+ */
+function _showSchemaReview(result) {
+  const content = document.createElement('div');
+
+  content.appendChild(html`
+    <div style="margin-bottom: 16px;">
+      <p style="color: var(--completed-border); margin-bottom: 8px;">
+        ${OPERATORS.INS.glyph} Successfully anchored ${result.rowCount} rows from ${result.filename}
+      </p>
+      <p style="font-size: 0.85rem; color: var(--text-secondary);">
+        Review the inferred schema below. Override types if needed (e.g., FIPS codes should be strings, not numbers).
+        Overrides are logged as provenance events — they do not modify Given data.
+      </p>
+    </div>
+  `);
+
+  const schemaTable = renderDataTable(
+    result.schema.map(s => ({
+      Column: s.name,
+      'Inferred Type': s.inferredType,
+      Confidence: `${Math.round(s.confidence * 100)}%`,
+      Samples: s.sampleValues.join(', ')
+    })),
+    ['Column', 'Inferred Type', 'Confidence', 'Samples']
+  );
+  content.appendChild(schemaTable);
+
+  // Null audit summary
+  const nullSummary = html`<div style="margin-top: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">${OPERATORS.NUL.glyph} NUL Audit Summary</h4></div>`;
+  const nullCols = Object.entries(result.nullAudit)
+    .filter(([_, counts]) => counts.CLEARED > 0 || counts.UNKNOWN > 0 || counts.NEVER_SET > 0);
+
+  if (nullCols.length > 0) {
+    for (const [col, counts] of nullCols) {
+      const line = html`<div style="font-size: 0.85rem; margin-left: 12px; color: var(--text-secondary);">
+        <strong>${col}:</strong>
+        ${counts.CLEARED > 0 ? `<span class="null-cleared">${counts.CLEARED} CLEARED</span> ` : ''}
+        ${counts.UNKNOWN > 0 ? `<span class="null-unknown">${counts.UNKNOWN} UNKNOWN</span> ` : ''}
+        ${counts.NEVER_SET > 0 ? `<span class="null-neverset">${counts.NEVER_SET} NEVER_SET</span>` : ''}
+      </div>`;
+      nullSummary.appendChild(line);
+    }
+  } else {
+    nullSummary.appendChild(html`<div style="font-size: 0.85rem; color: var(--text-muted);">No null values detected.</div>`);
+  }
+  content.appendChild(nullSummary);
+
+  renderModal(`SIG(⊡) Schema Review`, content, [
+    { label: 'Accept Schema', onClick: () => {}, primary: true }
+  ]);
+}

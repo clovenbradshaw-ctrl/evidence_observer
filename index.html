@@ -1,1 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evidence Observer — Analytical Workbench</title>
+  <meta name="description" content="Experience Engine: 𝓔 = (G, S, M, π, γ, σ). Structured data analysis with immutable sources, typed operations, and machine-readable audit trails.">
+  <style>
+    /* Critical inline styles for initial load */
+    body {
+      font-family: 'IBM Plex Mono', 'SF Mono', 'Fira Code', monospace;
+      background: #0f172a;
+      color: #f1f5f9;
+      margin: 0;
+    }
+    #app {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .init-loading {
+      text-align: center;
+    }
+    .init-loading .glyph {
+      font-size: 3rem;
+      margin-bottom: 16px;
+      color: #38bdf8;
+    }
+    .init-loading .helix {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-top: 12px;
+      letter-spacing: 0.1em;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #334155;
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="init-loading">
+      <div class="glyph">𝓔</div>
+      <div class="spinner"></div>
+      <div>Initializing Experience Engine</div>
+      <div class="helix">∅ → ⊡ → △ → | → ⋈ → ∨ → ∿ → ∥ → ↬</div>
+    </div>
+  </div>
 
+  <!-- sql.js — SQLite in WebAssembly -->
+  <script src="lib/sql-wasm.js"></script>
+
+  <!-- Application -->
+  <script type="module">
+    import { initApp } from './src/app.js';
+
+    // Wait for sql.js to be available, then init
+    if (typeof initSqlJs !== 'undefined') {
+      initApp();
+    } else {
+      // sql.js not loaded yet — wait briefly
+      window.addEventListener('load', () => {
+        if (typeof initSqlJs !== 'undefined') {
+          initApp();
+        } else {
+          document.getElementById('app').innerHTML = `
+            <div class="init-loading">
+              <div class="glyph" style="color: #dc2626;">∅</div>
+              <div>Failed to load sql.js</div>
+              <div class="helix">Ensure lib/sql-wasm.js and lib/sql-wasm.wasm are present</div>
+            </div>
+          `;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
