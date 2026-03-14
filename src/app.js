@@ -18,6 +18,7 @@ import { renderHorizonView } from './ui/horizon_view.js';
 import { renderDAGView } from './ui/dag_view.js';
 import { renderAuditView } from './ui/audit_view.js';
 import { renderExportView } from './ui/export_view.js';
+import { renderAIView } from './ui/ai_view.js';
 import { OPERATORS, HELIX_ORDER, formatOperator } from './models/operators.js';
 
 // Track current view
@@ -28,6 +29,7 @@ const VIEWS = {
   vault:    { label: 'Given-Log (G)', glyph: '△', render: renderVaultView },
   session:  { label: 'Meant-Graph (M)', glyph: '∿', render: renderSessionView },
   horizon:  { label: 'Horizon (S)', glyph: '⋈', render: renderHorizonView },
+  ai:       { label: 'AI Analysis', glyph: '⊡', render: renderAIView },
   dag:      { label: 'DAG', glyph: '↬', render: renderDAGView },
   audit:    { label: 'Provenance (π)', glyph: 'π', render: renderAuditView },
   export:   { label: 'Export', glyph: '⊡', render: renderExportView }
