@@ -1,0 +1,94 @@
+donor_name,amount,date,district,fips_code,category,address
+Tom Cash,500.00,2023-03-15,District 1,06037,individual,123 Main St
+Thomas Cash,250.00,2023-06-01,District 1,06037,individual,123 Main Street
+T. Cash,1000.00,2023-09-20,District 1,06037,individual,
+Maria Santos,750.00,2023-02-10,District 2,06073,individual,456 Oak Ave
+Maria R. Santos,200.00,2023-07-15,District 2,06073,individual,456 Oak Avenue
+Citizens for Progress,5000.00,2023-01-05,District 1,06037,pac,789 Capitol Blvd
+Citizens for Progress PAC,2500.00,2023-04-20,District 3,06059,pac,789 Capitol Boulevard
+James Wong,300.00,2023-03-01,District 3,06059,individual,
+J. Wong,150.00,2023-08-10,District 3,06059,individual,321 Pine St
+James K. Wong,400.00,2022-11-15,District 3,06059,individual,321 Pine Street
+Sarah Al-Rashid,1200.00,2023-05-22,District 4,06065,individual,555 Elm Drive
+S. Al-Rashid,600.00,2023-10-01,District 4,06065,individual,555 Elm Dr
+Tech Workers United,3000.00,2023-02-28,District 2,06073,pac,
+Robert Chen,175.00,2023-06-15,District 1,06037,individual,890 Cedar Lane
+Robert Chen,175.00,2023-06-15,District 1,06037,individual,890 Cedar Lane
+Bob Chen,500.00,2023-09-30,District 1,06037,individual,890 Cedar Ln
+Patricia Williams,800.00,2023-04-01,District 5,06071,individual,234 Birch Way
+Pat Williams,350.00,2022-12-20,District 5,06071,individual,
+P. Williams,100.00,2023-07-04,District 5,06071,individual,234 Birch Way
+Green Future Alliance,4500.00,2023-03-10,District 2,06073,pac,100 Environmental Way
+Green Future Alliance,2000.00,2023-08-15,District 4,06065,pac,100 Environmental Way
+Ahmed Hassan,225.00,2023-05-01,District 3,06059,individual,678 Maple Court
+A. Hassan,450.00,2023-09-12,District 3,06059,individual,
+Lin Zhao,350.00,2023-01-20,District 1,06037,individual,901 Spruce Ave
+Lin Zhao,350.00,2023-04-15,District 2,06073,individual,901 Spruce Avenue
+Community First PAC,6000.00,2023-06-30,District 5,06071,pac,50 Civic Center Dr
+,100.00,2023-07-01,District 1,06037,,Anonymous donation
+David Kim,0.00,2023-03-22,District 4,06065,individual,Cleared - refund processed
+David Kim,,2023-03-22,District 4,06065,individual,Pending verification
+Working Families Fund,3500.00,2023-02-14,District 3,06059,pac,
+Jennifer Adams,550.00,2021-09-15,District 1,06037,individual,111 First Ave
+Jennifer Adams,600.00,2022-03-20,District 1,06037,individual,111 First Ave
+Jennifer Adams,650.00,2023-06-10,District 1,06037,individual,111 First Avenue
+Michael Torres,275.00,2023-05-05,District 2,06073,individual,
+M. Torres,125.00,2023-11-01,District 2,06073,individual,222 Second St
+Elena Petrova,1500.00,2023-04-18,District 4,06065,individual,333 Third Blvd
+E. Petrova,750.00,2023-08-22,District 4,06065,individual,333 Third Boulevard
+Small Business Coalition,2800.00,2023-01-30,District 5,06071,pac,400 Commerce St
+Small Biz Coalition,1500.00,2023-07-20,District 5,06071,pac,400 Commerce Street
+Carlos Mendoza,400.00,2023-02-22,District 3,06059,individual,
+Carlos Mendoza,400.00,2023-05-22,District 3,06059,individual,
+Carlos Mendoza,400.00,2023-08-22,District 3,06059,individual,
+Neighborhood Alliance,7500.00,2023-03-01,District 1,06037,pac,75 Grassroots Lane
+Emily Park,325.00,2023-06-25,District 2,06073,individual,567 Fourth Place
+Emily J. Park,325.00,2023-10-15,District 2,06073,individual,567 4th Pl
+Dr. Richard Okafor,2000.00,2023-04-12,District 5,06071,individual,888 Medical Dr
+Richard Okafor,1000.00,2023-09-28,District 5,06071,individual,888 Medical Drive
+Sunrise PAC,4000.00,2022-08-01,District 4,06065,pac,
+Sunrise Political Action Committee,5500.00,2023-03-15,District 4,06065,pac,
+Nancy Liu,450.00,2023-07-08,District 1,06037,individual,999 Fifth St
+N. Liu,200.00,2023-12-01,District 1,06037,individual,
+Rebecca Johnson,700.00,2023-02-05,District 2,06073,individual,100 Sixth Ave
+R. Johnson,300.00,2023-08-30,District 2,06073,individual,100 Sixth Avenue
+Becky Johnson,150.00,2023-11-20,District 2,06073,individual,
+Labor United,8000.00,2023-01-15,District 3,06059,pac,200 Union Hall
+Andrew Nakamura,375.00,2023-05-18,District 4,06065,individual,300 Seventh Blvd
+A. Nakamura,375.00,2023-10-05,District 4,06065,individual,300 7th Boulevard
+Civic Engagement Fund,3200.00,2023-06-20,District 5,06071,pac,
+Diana Osei,525.00,2023-04-30,District 1,06037,individual,400 Eighth Rd
+D. Osei,250.00,2023-09-15,District 1,06037,individual,
+Teachers for Tomorrow,2200.00,2023-03-08,District 2,06073,pac,500 Education Way
+Samuel Reeves,800.00,2023-07-12,District 3,06059,individual,600 Ninth Ct
+Sam Reeves,400.00,2023-11-30,District 3,06059,individual,600 Ninth Court
+Healthcare Workers PAC,5000.00,2023-02-20,District 4,06065,pac,700 Hospital Way
+Yuki Tanaka,300.00,2023-05-25,District 5,06071,individual,800 Tenth Lane
+Y. Tanaka,150.00,2023-10-10,District 5,06071,individual,
+Progressive Action Network,6500.00,2023-01-25,District 1,06037,pac,900 Activist Ave
+Marcus Brown,275.00,2023-06-05,District 2,06073,individual,
+M. Brown,275.00,2023-09-05,District 2,06073,individual,
+Marcus A. Brown,550.00,2023-12-10,District 2,06073,individual,101 Eleventh Way
+Developers Alliance,4200.00,2023-04-05,District 3,06059,pac,201 Tech Park
+Angela Fischer,675.00,2023-07-22,District 4,06065,individual,301 Twelfth Pl
+A. Fischer,675.00,2023-11-05,District 4,06065,individual,301 12th Place
+Veterans Voice PAC,3800.00,2023-03-20,District 5,06071,pac,401 Memorial Dr
+Raj Patel,425.00,2023-05-10,District 1,06037,individual,501 Thirteenth St
+R. Patel,200.00,2023-08-15,District 1,06037,individual,
+Rajesh Patel,800.00,2023-12-05,District 1,06037,individual,501 13th Street
+Clean Energy Coalition,5500.00,2023-02-08,District 2,06073,pac,601 Solar Blvd
+Aisha Williams,350.00,2023-06-18,District 3,06059,individual,701 Fourteenth Ave
+A. Williams,175.00,2023-10-25,District 3,06059,individual,
+Arts & Culture Fund,1800.00,2023-04-22,District 4,06065,pac,801 Gallery Way
+Daniel O'Brien,450.00,2023-07-30,District 5,06071,individual,901 Fifteenth Rd
+Dan O'Brien,225.00,2023-11-15,District 5,06071,individual,
+Rural Communities PAC,4800.00,2023-03-28,District 1,06037,pac,
+Sophia Nguyen,575.00,2023-06-12,District 2,06073,individual,102 Sixteenth Ct
+S. Nguyen,575.00,2023-10-20,District 2,06073,individual,102 16th Court
+Justice Reform Alliance,7000.00,2023-01-10,District 3,06059,pac,202 Reform Way
+Chris Taylor,300.00,2023-05-28,District 4,06065,individual,
+C. Taylor,300.00,2023-09-08,District 4,06065,individual,302 Seventeenth Ln
+Transportation Workers Union,3500.00,2023-04-08,District 5,06071,pac,402 Transit Ave
+Olivia Santos,425.00,2023-07-05,District 1,06037,individual,502 Eighteenth Way
+O. Santos,425.00,2023-11-22,District 1,06037,individual,
+Affordable Housing Fund,6200.00,2023-02-15,District 2,06073,pac,602 Housing Blvd
