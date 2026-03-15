@@ -41,21 +41,18 @@ export function sig_parseCSV(text, delimiter = ',') {
 
 /**
  * SIG(⊡) — Parse JSON text into rows.
+ * Handles any shape: arrays of objects, wrapped arrays, single objects,
+ * arrays of primitives, and nested structures.
  *
  * @param {string} text - Raw JSON text
  * @returns {{ headers: string[], rows: Object[] }}
  */
 export function sig_parseJSON(text) {
   const parsed = JSON.parse(text);
-  let rows;
+  let rows = _extractRows(parsed);
 
-  if (Array.isArray(parsed)) {
-    rows = parsed;
-  } else if (parsed && typeof parsed === 'object') {
-    // Single object — wrap in array
-    rows = [parsed];
-  } else {
-    throw new Error('SIG: JSON must be an array of objects or a single object');
+  if (rows.length === 0) {
+    throw new Error('SIG: Could not extract any rows from this JSON');
   }
 
   // Collect all unique headers across all rows
@@ -78,6 +75,72 @@ export function sig_parseJSON(text) {
   }
 
   return { headers, rows };
+}
+
+/**
+ * Extract an array of row-objects from any JSON shape.
+ */
+function _extractRows(data) {
+  // Array of objects — the ideal case
+  if (Array.isArray(data)) {
+    if (data.length === 0) return [];
+    // Array of objects
+    if (typeof data[0] === 'object' && data[0] !== null && !Array.isArray(data[0])) {
+      return data.map(item => {
+        if (typeof item !== 'object' || item === null) return { value: item };
+        return item;
+      });
+    }
+    // Array of primitives — wrap each in {value: x}
+    if (typeof data[0] !== 'object') {
+      return data.map((v, i) => ({ index: i, value: v }));
+    }
+    // Array of arrays — treat as rows with column indices
+    if (Array.isArray(data[0])) {
+      return data.map((arr, i) => {
+        const row = { _row: i };
+        arr.forEach((v, j) => { row[`col_${j}`] = typeof v === 'object' && v !== null ? JSON.stringify(v) : v; });
+        return row;
+      });
+    }
+    return data.map(v => ({ value: v }));
+  }
+
+  // Single object — look for a property that is an array of objects (common wrapper pattern)
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    // Check all top-level keys for the largest array of objects
+    let bestKey = null;
+    let bestLen = 0;
+    for (const [key, val] of Object.entries(data)) {
+      if (Array.isArray(val) && val.length > bestLen) {
+        if (val.length > 0 && typeof val[0] === 'object' && val[0] !== null && !Array.isArray(val[0])) {
+          bestKey = key;
+          bestLen = val.length;
+        } else if (val.length > 0) {
+          // Array of primitives or arrays — still a candidate
+          if (bestLen === 0) {
+            bestKey = key;
+            bestLen = val.length;
+          }
+        }
+      }
+    }
+
+    // Found a nested array — extract it
+    if (bestKey && bestLen > 0) {
+      return _extractRows(data[bestKey]);
+    }
+
+    // No nested array — treat the object itself as a single row
+    return [data];
+  }
+
+  // Primitive — wrap it
+  if (data !== null && data !== undefined) {
+    return [{ value: data }];
+  }
+
+  return [];
 }
 
 /**
@@ -120,11 +183,10 @@ export function sig_inferSchema(headers, rows) {
 export function sig_detectFormat(filename, content) {
   const ext = filename.toLowerCase().split('.').pop();
 
-  if (ext === 'csv' || ext === 'tsv') {
-    return ext === 'tsv' ? 'tsv' : 'csv';
-  }
-  if (ext === 'json') {
-    return 'json';
+  if (ext === 'tsv') return 'tsv';
+  if (ext === 'csv') return 'csv';
+  if (ext === 'json' || ext === 'geojson' || ext === 'ndjson' || ext === 'jsonl') {
+    return ext === 'ndjson' || ext === 'jsonl' ? 'ndjson' : 'json';
   }
 
   // Try to detect from content
@@ -133,7 +195,51 @@ export function sig_detectFormat(filename, content) {
     return 'json';
   }
 
+  // Check for tab-delimited
+  const firstLine = trimmed.split('\n')[0] || '';
+  if (firstLine.includes('\t') && !firstLine.includes(',')) {
+    return 'tsv';
+  }
+
   return 'csv'; // Default assumption
+}
+
+/**
+ * SIG(⊡) — Parse newline-delimited JSON (NDJSON/JSONL).
+ */
+export function sig_parseNDJSON(text) {
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  const rows = [];
+  for (const line of lines) {
+    try {
+      const obj = JSON.parse(line.trim());
+      if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+        rows.push(obj);
+      } else {
+        rows.push({ value: obj });
+      }
+    } catch (e) {
+      // Skip unparseable lines
+    }
+  }
+
+  const headerSet = new Set();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) headerSet.add(key);
+  }
+  const headers = Array.from(headerSet);
+
+  // Flatten nested values
+  for (const row of rows) {
+    for (const key of headers) {
+      const v = row[key];
+      if (v !== null && v !== undefined && typeof v === 'object') {
+        row[key] = JSON.stringify(v);
+      }
+    }
+  }
+
+  return { headers, rows };
 }
 
 /**
@@ -149,6 +255,8 @@ export function sig_parseFile(filename, content) {
       return { ...sig_parseCSV(content, '\t'), format };
     case 'json':
       return { ...sig_parseJSON(content), format };
+    case 'ndjson':
+      return { ...sig_parseNDJSON(content), format };
     default:
       throw new Error(`SIG: Unsupported file format: ${format}`);
   }

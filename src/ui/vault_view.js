@@ -31,15 +31,15 @@ export function renderVaultView(container) {
   // File upload dropzone
   const dropzone = renderDropzone(async (file) => {
     try {
-      toast('INS(△) Ingesting...', 'info');
+      toast('Ingesting file...', 'info');
       const result = await ins_ingest(file);
 
       if (result.status === 'duplicate') {
-        toast(`SIG(⊡): Duplicate — file already in Given-Log`, 'error');
+        toast('Duplicate — this file is already in the Given-Log', 'error');
         return;
       }
 
-      toast(`INS(△) Anchored: ${result.rowCount} rows, ${result.columnCount} columns`, 'success');
+      toast(`Ingested: ${result.rowCount} rows, ${result.columnCount} columns`, 'success');
 
       // Show schema review modal
       _showSchemaReview(result);
@@ -47,7 +47,7 @@ export function renderVaultView(container) {
       // Re-render source list
       _renderSourceList(sourceListContainer);
     } catch (err) {
-      toast(`INS(△) Failed: ${err.message}`, 'error');
+      toast(`Upload failed: ${err.message}`, 'error');
       console.error(err);
     }
   });
@@ -241,7 +241,7 @@ function _showSchemaReview(result) {
       Column: s.name,
       'Inferred Type': s.inferredType,
       Confidence: `${Math.round(s.confidence * 100)}%`,
-      Samples: s.sampleValues.join(', ')
+      Samples: (s.sampleValues || []).map(v => v == null ? '(null)' : String(v)).join(', ')
     })),
     ['Column', 'Inferred Type', 'Confidence', 'Samples']
   );

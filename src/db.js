@@ -97,12 +97,12 @@ export async function initDB(sqlPromise, schemaSQL) {
       console.log('[db] Restored from IndexedDB');
     } catch (e) {
       console.warn('[db] Restored DB missing schema, re-applying...');
-      _db.run(schemaSQL);
+      _db.exec(schemaSQL);
       console.log('[db] Schema applied to restored DB');
     }
   } else {
     _db = new SQL.Database();
-    _db.run(schemaSQL);
+    _db.exec(schemaSQL);
     console.log('[db] Created fresh database with schema');
   }
 

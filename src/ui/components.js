@@ -88,14 +88,13 @@ export function renderDropzone(onFile) {
   const zone = html`
     <div class="dropzone">
       <span class="drop-icon"><i class="ph ph-upload-simple" style="font-size: 2.5rem;"></i></span>
-      <p>Drop a CSV or JSON file to ingest into the Given-Log</p>
+      <p>Drop any data file to ingest into the Given-Log</p>
       <p style="font-size: 0.8rem; margin-top: 8px; color: var(--text-muted);">or click to browse</p>
     </div>
   `;
 
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.csv,.tsv,.json';
   input.style.display = 'none';
 
   zone.addEventListener('click', () => input.click());
