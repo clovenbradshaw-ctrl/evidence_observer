@@ -17,8 +17,8 @@ export function renderExportView(container) {
   const view = html`
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="font-size: 1.2rem;">
-          <span style="color: var(--accent);">${OPERATORS.SIG.glyph}</span>
+        <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+          <i class="ph ph-export" style="color: var(--accent); font-size: 1.3rem;"></i>
           Export & Import
         </h2>
       </div>
@@ -30,7 +30,7 @@ export function renderExportView(container) {
   if (sessions.length === 0) {
     view.appendChild(html`
       <div class="empty-state">
-        <div class="glyph">⊡</div>
+        <div class="empty-icon"><i class="ph ph-export" style="font-size: 3rem;"></i></div>
         <p>No sessions to export.<br>Create a session and run analysis steps first.</p>
       </div>
     `);
@@ -55,27 +55,27 @@ export function renderExportView(container) {
     const formats = html`
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
         <div class="card" style="cursor: pointer;" id="export-notation">
-          <div class="card-title">${OPERATORS.SIG.glyph} Notation Package</div>
+          <div class="card-title"><i class="ph ph-file-code" style="color: var(--accent);"></i> Notation Package</div>
           <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
             JSON with full step sequence, notation, inputs, lens states.
             Replayable given same Given sources.
           </div>
         </div>
         <div class="card" style="cursor: pointer;" id="export-methodology">
-          <div class="card-title">${OPERATORS.ALT.glyph} Methodology Document</div>
+          <div class="card-title"><i class="ph ph-article" style="color: var(--accent);"></i> Methodology Document</div>
           <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
             Plain-language methodology suitable for publication.
             Auto-generated from public-view step descriptions.
           </div>
         </div>
         <div class="card" style="cursor: pointer;" id="export-linked">
-          <div class="card-title">${OPERATORS.CON.glyph} Linked Data Package</div>
+          <div class="card-title"><i class="ph ph-link" style="color: var(--accent);"></i> Linked Data Package</div>
           <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
             Output tables with per-row provenance keys mapping to Given source records.
           </div>
         </div>
         <div class="card" style="cursor: pointer; border-color: var(--accent);" id="export-html">
-          <div class="card-title">𝓔 Self-Contained HTML</div>
+          <div class="card-title"><i class="ph ph-file-html" style="color: var(--accent);"></i> Self-Contained HTML</div>
           <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
             Complete workbench + all data in a single .html file.
             Open in any browser or import back into this app.
@@ -123,12 +123,12 @@ export function renderExportView(container) {
   // Import section
   view.appendChild(html`<hr style="border-color: var(--border); margin: 24px 0;">`);
   view.appendChild(html`
-    <h3 style="font-size: 1rem; margin-bottom: 12px;">${OPERATORS.INS.glyph} Import</h3>
+    <h3 style="font-size: 1rem; margin-bottom: 12px;"><i class="ph ph-download-simple"></i> Import</h3>
   `);
 
   const importBtn = html`
     <div class="card" style="cursor: pointer; text-align: center; padding: 30px;">
-      <div style="font-size: 2rem; margin-bottom: 8px;">△</div>
+      <div style="font-size: 2rem; margin-bottom: 8px;"><i class="ph ph-upload-simple" style="font-size: 2rem; color: var(--text-muted);"></i></div>
       <p>Drop or click to import a self-contained HTML file</p>
       <p style="font-size: 0.8rem; color: var(--text-muted);">Restores the complete workbench state from an exported file</p>
     </div>

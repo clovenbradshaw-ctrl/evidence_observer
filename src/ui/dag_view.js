@@ -22,9 +22,9 @@ export function renderDAGView(container) {
   const view = html`
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="font-size: 1.2rem;">
-          <span style="color: var(--accent);">${OPERATORS.REC.glyph}</span>
-          Meant-Graph DAG
+        <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+          <i class="ph ph-flow-arrow" style="color: var(--accent); font-size: 1.3rem;"></i>
+          DAG
         </h2>
       </div>
     </div>
@@ -35,7 +35,7 @@ export function renderDAGView(container) {
   if (sessions.length === 0) {
     view.appendChild(html`
       <div class="empty-state">
-        <div class="glyph">↬</div>
+        <div class="empty-icon"><i class="ph ph-flow-arrow" style="font-size: 3rem;"></i></div>
         <p>No sessions to visualize.<br>Create a session and add steps first.</p>
       </div>
     `);
@@ -181,7 +181,7 @@ function _renderDAGSVG(container, sessionId) {
       label.setAttribute('x', '44');
       label.setAttribute('y', '24');
       label.setAttribute('font-size', '12');
-      label.setAttribute('fill', '#f1f5f9');
+      label.setAttribute('fill', '#0f172a');
       label.setAttribute('font-family', 'monospace');
       label.textContent = node.label.length > 14 ? node.label.substring(0, 14) + '…' : node.label;
       g.appendChild(label);

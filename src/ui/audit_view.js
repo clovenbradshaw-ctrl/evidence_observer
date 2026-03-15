@@ -18,9 +18,9 @@ export function renderAuditView(container) {
   const view = html`
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="font-size: 1.2rem;">
-          <span style="color: var(--accent);">π</span>
-          Provenance Surface
+        <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+          <i class="ph ph-fingerprint" style="color: var(--accent); font-size: 1.3rem;"></i>
+          Provenance
         </h2>
       </div>
     </div>
@@ -29,7 +29,7 @@ export function renderAuditView(container) {
   // Session selector
   const sessions = getAllSessions();
   if (sessions.length === 0) {
-    view.appendChild(html`<div class="empty-state"><div class="glyph">π</div><p>No sessions to audit.</p></div>`);
+    view.appendChild(html`<div class="empty-state"><div class="empty-icon"><i class="ph ph-fingerprint" style="font-size: 3rem;"></i></div><p>No sessions to audit.</p></div>`);
     container.appendChild(view);
     return;
   }

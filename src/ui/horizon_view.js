@@ -29,13 +29,13 @@ export function renderHorizonView(container) {
   const view = html`
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="font-size: 1.2rem;">
-          <span style="color: var(--accent);">⋈</span>
-          Horizon-Lattice (S)
+        <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+          <i class="ph ph-binoculars" style="color: var(--accent); font-size: 1.3rem;"></i>
+          Horizon
         </h2>
         <div style="display: flex; gap: 8px;">
-          <button class="btn btn-primary" id="btn-new-lens">+ SEG(|) New Lens</button>
-          <button class="btn" id="btn-compose-horizon">⋈ CON Compose Horizon</button>
+          <button class="btn btn-primary" id="btn-new-lens"><i class="ph ph-plus"></i> New Lens</button>
+          <button class="btn" id="btn-compose-horizon"><i class="ph ph-intersect"></i> Compose Horizon</button>
         </div>
       </div>
     </div>
@@ -48,16 +48,16 @@ export function renderHorizonView(container) {
   if (lenses.length === 0 && horizons.length === 0) {
     view.appendChild(html`
       <div class="empty-state">
-        <div class="glyph">⋈</div>
+        <div class="empty-icon"><i class="ph ph-binoculars" style="font-size: 3rem;"></i></div>
         <p>No lenses or horizons yet.<br>
-        Create a lens with SEG(|) to cut the data space,<br>
-        then compose with CON(⋈) to join into a horizon.</p>
+        Create a lens to cut the data space,<br>
+        then compose into a horizon.</p>
       </div>
     `);
   } else {
     // Horizons
     if (horizons.length > 0) {
-      view.appendChild(html`<h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--text-secondary);">⋈ Composed Horizons</h3>`);
+      view.appendChild(html`<h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--text-secondary);"><i class="ph ph-intersect"></i> Composed Horizons</h3>`);
       for (const horizon of horizons) {
         view.appendChild(_renderHorizonCard(horizon));
       }
@@ -65,7 +65,7 @@ export function renderHorizonView(container) {
 
     // Lenses
     if (lenses.length > 0) {
-      view.appendChild(html`<h3 style="font-size: 1rem; margin: 20px 0 12px; color: var(--text-secondary);">| Individual Lenses</h3>`);
+      view.appendChild(html`<h3 style="font-size: 1rem; margin: 20px 0 12px; color: var(--text-secondary);"><i class="ph ph-funnel"></i> Individual Lenses</h3>`);
       for (const lens of lenses) {
         if (!lens.parent_id) {
           view.appendChild(_renderLensCard(lens));

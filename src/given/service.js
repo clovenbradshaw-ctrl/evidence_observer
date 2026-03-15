@@ -74,7 +74,17 @@ export async function ins_ingest(file, options = {}) {
   }
 
   // Step 3: SIG(⊡) — Parse and infer types
-  const { headers, rows, format } = sig_parseFile(filename, content);
+  let headers, rows, format;
+  try {
+    ({ headers, rows, format } = sig_parseFile(filename, content));
+  } catch (parseErr) {
+    throw new Error(`Could not parse file: ${parseErr.message}`);
+  }
+
+  if (!rows || rows.length === 0) {
+    throw new Error('No data rows found in file');
+  }
+
   let schema = sig_inferSchema(headers, rows);
 
   // Apply manual overrides if provided

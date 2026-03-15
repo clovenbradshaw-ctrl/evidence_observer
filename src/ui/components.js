@@ -87,15 +87,14 @@ export function renderDataTable(rows, columns, options = {}) {
 export function renderDropzone(onFile) {
   const zone = html`
     <div class="dropzone">
-      <span class="glyph">△</span>
-      <p>INS(△) — Drop CSV or JSON file to ingest into Given-Log</p>
-      <p style="font-size: 0.8rem; margin-top: 8px;">or click to browse</p>
+      <span class="drop-icon"><i class="ph ph-upload-simple" style="font-size: 2.5rem;"></i></span>
+      <p>Drop any data file to ingest into the Given-Log</p>
+      <p style="font-size: 0.8rem; margin-top: 8px; color: var(--text-muted);">or click to browse</p>
     </div>
   `;
 
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.csv,.tsv,.json';
   input.style.display = 'none';
 
   zone.addEventListener('click', () => input.click());
@@ -246,12 +245,18 @@ export function renderHelixBar(activeOperator = null) {
  */
 export function toast(message, type = 'info') {
   const el = document.createElement('div');
+  const colors = {
+    error: { bg: '#fef2f2', border: '#fecaca', text: '#991b1b' },
+    success: { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534' },
+    info: { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' }
+  };
+  const c = colors[type] || colors.info;
   el.style.cssText = `
     position: fixed; bottom: 24px; right: 24px; z-index: 2000;
     padding: 12px 20px; border-radius: 8px; font-size: 0.85rem;
-    color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    animation: fadeIn 0.2s ease;
-    background: ${type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#0891b2'};
+    color: ${c.text}; background: ${c.bg}; border: 1px solid ${c.border};
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    font-family: inherit;
   `;
   el.textContent = message;
   document.body.appendChild(el);

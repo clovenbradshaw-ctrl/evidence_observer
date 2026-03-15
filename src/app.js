@@ -1,13 +1,6 @@
 /**
  * Analytical Workbench — Main Application
- * Experience Engine: 𝓔 = (G, S, M, π, γ, σ)
- *
- * G = Given-Log (vault)     — Existence Domain
- * S = Horizon-Lattice (lens) — Structure Domain
- * M = Meant-Graph (runtime)  — Significance Domain
- * π = Provenance function
- * γ = Availability function
- * σ = Supersession function
+ * Experience Engine: G, S, M, π
  */
 
 import { initDB, persistToIndexedDB } from './db.js';
@@ -19,56 +12,44 @@ import { renderDAGView } from './ui/dag_view.js';
 import { renderAuditView } from './ui/audit_view.js';
 import { renderExportView } from './ui/export_view.js';
 import { renderAIView } from './ui/ai_view.js';
-import { OPERATORS, HELIX_ORDER, formatOperator } from './models/operators.js';
+import { OPERATORS, HELIX_ORDER } from './models/operators.js';
 
-// Track current view
 let currentView = 'vault';
 
-// Views registry
 const VIEWS = {
-  vault:    { label: 'Given-Log (G)', glyph: '△', render: renderVaultView },
-  session:  { label: 'Meant-Graph (M)', glyph: '∿', render: renderSessionView },
-  horizon:  { label: 'Horizon (S)', glyph: '⋈', render: renderHorizonView },
-  ai:       { label: 'AI Analysis', glyph: '⊡', render: renderAIView },
-  dag:      { label: 'DAG', glyph: '↬', render: renderDAGView },
-  audit:    { label: 'Provenance (π)', glyph: 'π', render: renderAuditView },
-  export:   { label: 'Export', glyph: '⊡', render: renderExportView }
+  vault:    { label: 'Given-Log',    icon: 'ph ph-vault',          render: renderVaultView },
+  session:  { label: 'Meant-Graph',  icon: 'ph ph-graph',          render: renderSessionView },
+  horizon:  { label: 'Horizon',      icon: 'ph ph-binoculars',     render: renderHorizonView },
+  ai:       { label: 'AI Analysis',  icon: 'ph ph-sparkle',        render: renderAIView },
+  dag:      { label: 'DAG',          icon: 'ph ph-flow-arrow',     render: renderDAGView },
+  audit:    { label: 'Provenance',   icon: 'ph ph-fingerprint',    render: renderAuditView },
+  export:   { label: 'Export',       icon: 'ph ph-export',         render: renderExportView }
 };
 
 /**
  * Initialize the application.
  */
 export async function initApp() {
-  // Inject styles
   injectStyles();
 
-  // Show loading state
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="loading" style="min-height: 100vh;">
       <div class="spinner"></div>
-      <div>Initializing Experience Engine 𝓔 = (G, S, M, π, γ, σ)</div>
+      <div>Initializing Evidence Observer</div>
     </div>
   `;
 
   try {
-    // Load sql.js
     const sqlPromise = initSqlJs({ locateFile: file => `lib/${file}` });
-
-    // Load schema
     const schemaResponse = await fetch('src/schema.sql');
     const schemaSQL = await schemaResponse.text();
-
-    // Initialize database
     await initDB(sqlPromise, schemaSQL);
-
-    // Render the app
     renderApp();
-
   } catch (err) {
     app.innerHTML = `
       <div class="loading" style="min-height: 100vh; color: var(--failed-border);">
-        <div style="font-size: 2rem;">∅</div>
+        <div><i class="ph ph-warning-circle" style="font-size: 2rem;"></i></div>
         <div>Failed to initialize: ${err.message}</div>
         <div style="font-size: 0.8rem; color: var(--text-muted); max-width: 500px; word-break: break-all;">${err.stack}</div>
       </div>
@@ -88,7 +69,7 @@ function renderApp() {
   const header = document.createElement('header');
   header.innerHTML = `
     <h1>
-      <span class="glyph">𝓔</span>
+      <span class="header-icon"><i class="ph ph-atom" style="font-size: 1.3rem;"></i></span>
       Evidence Observer
     </h1>
   `;
@@ -97,7 +78,7 @@ function renderApp() {
   const nav = document.createElement('nav');
   for (const [key, view] of Object.entries(VIEWS)) {
     const btn = document.createElement('button');
-    btn.textContent = `${view.glyph} ${view.label}`;
+    btn.innerHTML = `<i class="${view.icon}"></i> ${view.label}`;
     btn.className = key === currentView ? 'active' : '';
     btn.addEventListener('click', () => navigateTo(key));
     nav.appendChild(btn);
@@ -107,7 +88,7 @@ function renderApp() {
 
   // Helix bar
   const helixContainer = document.createElement('div');
-  helixContainer.style.cssText = 'padding: 4px 24px; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle);';
+  helixContainer.style.cssText = 'padding: 4px 24px; background: var(--bg-surface); border-bottom: 1px solid var(--border);';
   const helixBar = document.createElement('div');
   helixBar.className = 'helix-bar';
   helixBar.style.justifyContent = 'center';
@@ -117,7 +98,7 @@ function renderApp() {
     if (i > 0) {
       const arrow = document.createElement('span');
       arrow.className = 'helix-arrow';
-      arrow.textContent = '→';
+      arrow.textContent = '·';
       helixBar.appendChild(arrow);
     }
     const step = document.createElement('span');
@@ -134,7 +115,6 @@ function renderApp() {
   main.id = 'main-content';
   app.appendChild(main);
 
-  // Render current view
   VIEWS[currentView].render(main);
 }
 
@@ -147,5 +127,4 @@ function navigateTo(viewKey) {
   renderApp();
 }
 
-// Make navigateTo available globally for dynamic use
 window.navigateTo = navigateTo;

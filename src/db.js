@@ -91,15 +91,21 @@ export async function initDB(sqlPromise, schemaSQL) {
 
   if (savedState) {
     _db = new SQL.Database(new Uint8Array(savedState));
-    console.log('[db] Restored from IndexedDB');
+    // Verify schema exists — apply if tables are missing (stale/corrupted state)
+    try {
+      _db.exec("SELECT 1 FROM given_log LIMIT 0");
+      console.log('[db] Restored from IndexedDB');
+    } catch (e) {
+      console.warn('[db] Restored DB missing schema, re-applying...');
+      _db.exec(schemaSQL);
+      console.log('[db] Schema applied to restored DB');
+    }
   } else {
     _db = new SQL.Database();
-    _db.run(schemaSQL);
+    _db.exec(schemaSQL);
     console.log('[db] Created fresh database with schema');
   }
 
-  // Enable WAL mode for better concurrent read performance
-  _db.run('PRAGMA journal_mode=WAL');
   _db.run('PRAGMA foreign_keys=ON');
 
   // Start autosave timer

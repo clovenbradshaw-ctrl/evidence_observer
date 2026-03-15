@@ -19,11 +19,11 @@ export function renderVaultView(container) {
   const view = html`
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="font-size: 1.2rem;">
-          <span style="color: var(--given-border);">${OPERATORS.INS.glyph}</span>
-          Given-Log — Existence Domain
+        <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+          <i class="ph ph-vault" style="color: var(--given-border); font-size: 1.3rem;"></i>
+          Given-Log
         </h2>
-        <span class="given-badge">IMMUTABLE</span>
+        <span class="given-badge"><i class="ph ph-lock-simple" style="font-size: 0.7rem;"></i> Immutable</span>
       </div>
     </div>
   `;
@@ -31,15 +31,15 @@ export function renderVaultView(container) {
   // File upload dropzone
   const dropzone = renderDropzone(async (file) => {
     try {
-      toast('INS(△) Ingesting...', 'info');
+      toast('Ingesting file...', 'info');
       const result = await ins_ingest(file);
 
       if (result.status === 'duplicate') {
-        toast(`SIG(⊡): Duplicate — file already in Given-Log`, 'error');
+        toast('Duplicate — this file is already in the Given-Log', 'error');
         return;
       }
 
-      toast(`INS(△) Anchored: ${result.rowCount} rows, ${result.columnCount} columns`, 'success');
+      toast(`Ingested: ${result.rowCount} rows, ${result.columnCount} columns`, 'success');
 
       // Show schema review modal
       _showSchemaReview(result);
@@ -47,7 +47,7 @@ export function renderVaultView(container) {
       // Re-render source list
       _renderSourceList(sourceListContainer);
     } catch (err) {
-      toast(`INS(△) Failed: ${err.message}`, 'error');
+      toast(`Upload failed: ${err.message}`, 'error');
       console.error(err);
     }
   });
@@ -73,7 +73,7 @@ function _renderSourceList(container) {
   if (sources.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="glyph">∅</div>
+        <div class="empty-icon"><i class="ph ph-empty" style="font-size: 3rem;"></i></div>
         <p>No sources in the Given-Log yet.<br>
         Upload a CSV or JSON file to begin.</p>
       </div>
@@ -104,16 +104,15 @@ function _renderSourceCard(source) {
   const card = html`
     <div class="card given-row" style="cursor: pointer;">
       <div class="card-header">
-        <span class="op-glyph existence">${OPERATORS.INS.glyph}</span>
+        <span class="op-glyph existence"><i class="ph ph-file-text" style="font-size: 1rem;"></i></span>
         <div style="flex: 1;">
           <div class="card-title">${source.filename}</div>
           <div style="font-size: 0.8rem; color: var(--text-muted);">
-            ${source.row_count} rows × ${source.column_count} columns
-            · SHA-256: ${source.sha256_hash.substring(0, 12)}…
-            · ${new Date(source.ingested_at).toLocaleString()}
+            ${source.row_count} rows · ${source.column_count} columns
+            · ${new Date(source.ingested_at).toLocaleDateString()}
           </div>
         </div>
-        <span class="given-badge">Given</span>
+        <span class="given-badge"><i class="ph ph-lock-simple" style="font-size: 0.65rem;"></i> Given</span>
       </div>
     </div>
   `;
@@ -242,7 +241,7 @@ function _showSchemaReview(result) {
       Column: s.name,
       'Inferred Type': s.inferredType,
       Confidence: `${Math.round(s.confidence * 100)}%`,
-      Samples: s.sampleValues.join(', ')
+      Samples: (s.sampleValues || []).map(v => v == null ? '(null)' : String(v)).join(', ')
     })),
     ['Column', 'Inferred Type', 'Confidence', 'Samples']
   );
