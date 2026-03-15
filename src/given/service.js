@@ -8,7 +8,7 @@
  * Corrected versions create new Given-Log entries with derived_from pointers.
  */
 
-import { persistToIndexedDB, storeBlob } from '../db.js';
+import { persistToIndexedDB, storeBlob, getBlob } from '../db.js';
 import { ins_createSource, ins_createAnchor, hashExists } from '../models/given_log.js';
 import { sig_parseFile, sig_inferSchema } from './parser.js';
 import { nul_nullifyRow, nul_audit } from './nul.js';
@@ -192,7 +192,7 @@ export async function getSourceData(source) {
 
   if (dataJson && dataJson._blob) {
     // Large dataset stored in IndexedDB
-    const content = await import('../db.js').then(db => db.getBlob(`given_data_${source.id}`));
+    const content = await getBlob(`given_data_${source.id}`);
     if (!content) return [];
     const text = typeof content === 'string' ? content : new TextDecoder().decode(content);
     const { rows } = sig_parseFile(source.filename, text);
