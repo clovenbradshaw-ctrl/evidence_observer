@@ -14,32 +14,53 @@ const AUTOSAVE_INTERVAL_MS = 30000;
 
 let _db = null;
 let _autosaveTimer = null;
+let _idb = null;
+let _idbFailed = false;
 
 /**
  * Open IndexedDB for persistent storage.
+ * Caches the connection and returns null if IndexedDB is unavailable.
  */
 function openIndexedDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
-    request.onupgradeneeded = (event) => {
-      const idb = event.target.result;
-      if (!idb.objectStoreNames.contains(IDB_STORE_DB)) {
-        idb.createObjectStore(IDB_STORE_DB);
-      }
-      if (!idb.objectStoreNames.contains(IDB_STORE_BLOBS)) {
-        idb.createObjectStore(IDB_STORE_BLOBS);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+  if (_idbFailed) return Promise.resolve(null);
+  if (_idb) return Promise.resolve(_idb);
+
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+      request.onupgradeneeded = (event) => {
+        const idb = event.target.result;
+        if (!idb.objectStoreNames.contains(IDB_STORE_DB)) {
+          idb.createObjectStore(IDB_STORE_DB);
+        }
+        if (!idb.objectStoreNames.contains(IDB_STORE_BLOBS)) {
+          idb.createObjectStore(IDB_STORE_BLOBS);
+        }
+      };
+      request.onsuccess = () => {
+        _idb = request.result;
+        resolve(_idb);
+      };
+      request.onerror = () => {
+        console.warn('[db] IndexedDB unavailable:', request.error?.message);
+        _idbFailed = true;
+        resolve(null);
+      };
+    } catch (e) {
+      console.warn('[db] IndexedDB not supported:', e.message);
+      _idbFailed = true;
+      resolve(null);
+    }
   });
 }
 
 /**
  * Read a value from IndexedDB.
+ * Returns undefined if IndexedDB is unavailable.
  */
 async function idbGet(storeName, key) {
   const idb = await openIndexedDB();
+  if (!idb) return undefined;
   return new Promise((resolve, reject) => {
     const tx = idb.transaction(storeName, 'readonly');
     const store = tx.objectStore(storeName);
@@ -51,9 +72,11 @@ async function idbGet(storeName, key) {
 
 /**
  * Write a value to IndexedDB.
+ * Silently skips if IndexedDB is unavailable.
  */
 async function idbPut(storeName, key, value) {
   const idb = await openIndexedDB();
+  if (!idb) return;
   return new Promise((resolve, reject) => {
     const tx = idb.transaction(storeName, 'readwrite');
     const store = tx.objectStore(storeName);
@@ -61,6 +84,13 @@ async function idbPut(storeName, key, value) {
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
+}
+
+/**
+ * Check if IndexedDB is available (not failed on prior attempt).
+ */
+export function isIndexedDBAvailable() {
+  return !_idbFailed;
 }
 
 /**
@@ -230,6 +260,7 @@ export function closeDB() {
  */
 export async function exportAllBlobs() {
   const idb = await openIndexedDB();
+  if (!idb) return {};
   return new Promise((resolve, reject) => {
     const tx = idb.transaction(IDB_STORE_BLOBS, 'readonly');
     const store = tx.objectStore(IDB_STORE_BLOBS);

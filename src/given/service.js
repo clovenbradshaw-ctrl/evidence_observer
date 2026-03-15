@@ -8,7 +8,7 @@
  * Corrected versions create new Given-Log entries with derived_from pointers.
  */
 
-import { persistToIndexedDB, storeBlob, getBlob, uuid } from '../db.js';
+import { persistToIndexedDB, storeBlob, getBlob, uuid, isIndexedDBAvailable } from '../db.js';
 import { ins_createSource, ins_createAnchor, hashExists } from '../models/given_log.js';
 import { sig_parseFile, sig_inferSchema } from './parser.js';
 import { nul_nullifyRow, nul_audit } from './nul.js';
@@ -156,7 +156,7 @@ export async function ins_ingest(file, options = {}) {
 
   // Step 5: Determine storage strategy
   const DATA_SIZE_THRESHOLD = 1024 * 1024; // 1MB
-  const isLargeDataset = content.length > DATA_SIZE_THRESHOLD;
+  let isLargeDataset = content.length > DATA_SIZE_THRESHOLD && isIndexedDBAvailable();
   let dataJson;
 
   if (isLargeDataset) {
@@ -243,8 +243,10 @@ export async function ins_ingest(file, options = {}) {
     hash
   });
 
-  // Persist to IndexedDB
-  await persistToIndexedDB();
+  // Persist to IndexedDB (best-effort — data is in SQLite regardless)
+  await persistToIndexedDB().catch(err =>
+    console.warn('[ins] IndexedDB persistence failed (data is in memory):', err.message)
+  );
 
   return {
     status: 'ingested',
