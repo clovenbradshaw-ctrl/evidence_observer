@@ -71,6 +71,9 @@ code, .code-editor, .notation {
   flex-direction: row;
   height: 100vh;
   overflow: hidden;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 0;
 }
 
 /* ============ Sidebar ============ */
@@ -222,7 +225,6 @@ main {
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px;
-  max-width: 1000px;
   width: 100%;
 }
 
@@ -673,7 +675,6 @@ main {
 .sources-layout {
   display: flex;
   gap: 20px;
-  min-height: 400px;
 }
 
 .sources-left {
@@ -689,7 +690,6 @@ main {
   border: 0.5px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
-  align-self: flex-start;
 }
 
 .source-grid {
