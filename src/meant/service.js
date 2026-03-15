@@ -15,6 +15,7 @@ import {
 } from '../models/meant_graph.js';
 import { OPERATORS, StepStatus } from '../models/operators.js';
 import { getSource } from '../models/given_log.js';
+import { getSourceData } from '../given/service.js';
 import { validateHelixOrdering, validateOperatorConsistency } from './helix.js';
 import { generateNotation } from './notation.js';
 import { executeStepCode } from './executor.js';
@@ -84,10 +85,10 @@ export async function executeStep(stepId, horizonState = null) {
       let data = [];
 
       if (input.type === 'given') {
-        // Load Given-Log data
+        // Load Given-Log data (handles both inline and blob storage)
         const source = input.data;
         try {
-          data = JSON.parse(source.data_json);
+          data = await getSourceData(source);
         } catch (e) {
           data = [];
         }

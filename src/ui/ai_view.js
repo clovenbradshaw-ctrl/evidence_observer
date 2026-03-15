@@ -9,6 +9,7 @@
 
 import { OPERATORS, formatOperator, TRIAD_LABELS } from '../models/operators.js';
 import { getAllSources } from '../models/given_log.js';
+import { getSourceData } from '../given/service.js';
 import { DEFAULT_MODULES, getModulesByTriad } from '../ai/modules.js';
 import { getCustomModules, importModules, deleteCustomModule, exportModules, generateModuleFromDescription } from '../ai/module_builder.js';
 import { callLLM, isAIConfigured } from '../ai/service.js';
@@ -218,9 +219,9 @@ async function _runAnalysis(container) {
 
   let data = [];
   try {
-    data = JSON.parse(source.data_json);
+    data = await getSourceData(source);
   } catch (e) {
-    toast('Failed to parse source data', 'error');
+    toast('Failed to load source data', 'error');
     return;
   }
 

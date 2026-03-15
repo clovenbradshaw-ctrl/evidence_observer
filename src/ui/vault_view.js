@@ -184,7 +184,7 @@ async function _showSourceDetail(source) {
   const dataSection = html`<div><h4 style="font-size: 0.9rem; margin-bottom: 8px;">Data Preview</h4></div>`;
 
   try {
-    const data = JSON.parse(source.data_json);
+    const data = await getSourceData(source);
     const rows = Array.isArray(data) ? data : [];
     const previewRows = rows.slice(0, 50);
     const headers = schema.map(s => s.name);
@@ -208,7 +208,7 @@ async function _showSourceDetail(source) {
       }
     }
   } catch (e) {
-    dataSection.appendChild(html`<div style="color: var(--text-muted);">Data stored in IndexedDB (large dataset)</div>`);
+    dataSection.appendChild(html`<div style="color: var(--text-muted);">Failed to load data preview</div>`);
   }
 
   content.appendChild(dataSection);
