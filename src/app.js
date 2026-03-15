@@ -14,7 +14,6 @@ import { renderAuditView } from './ui/audit_view.js';
 import { renderExportView } from './ui/export_view.js';
 import { renderAIView } from './ui/ai_view.js';
 import { renderEOQLView } from './ui/eoql_view.js';
-import { renderValidationView } from './ui/validation_view.js';
 import { OPERATORS, HELIX_ORDER } from './models/operators.js';
 
 let currentView = 'vault';
@@ -22,7 +21,6 @@ let currentView = 'vault';
 const VIEWS = {
   vault:      { label: 'Sources',         section: 'data',      icon: '\u25A1',  render: renderVaultView },
   eoql:       { label: 'EOQL',            section: 'data',      icon: '\u25B7',  render: renderEOQLView },
-  validation: { label: 'Audit Dashboard', section: 'data',      icon: '\u2713',  render: renderValidationView },
   session:    { label: 'Workbook',        section: 'analysis',  icon: '\u2261',  render: renderSessionView },
   ai:         { label: 'AI Analysis',     section: 'analysis',  icon: '\u2726',  render: renderAIView },
   audit:      { label: 'Audit Trail',     section: 'analysis',  icon: '\u25D0',  render: renderAuditView },

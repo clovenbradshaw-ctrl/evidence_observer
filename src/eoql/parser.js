@@ -475,21 +475,103 @@ function _execINS(ast, context) {
     const inner = executeEOQL(ast.nested, context);
     const name = ast.args.length > 1 ? ast.args[1].replace(/"/g, '') : `derived_${Date.now()}`;
     context.sources[name] = inner.result;
+
+    // Collect the full derivation history from the nested command chain
+    const derivationHistory = _collectDerivationHistory(ast.nested, context);
+
     return {
       result: inner.result,
       summary: `Inserted ${inner.result.length} rows as "${name}"`,
       op: 'INS',
-      meta: { name, rowCount: inner.result.length }
+      meta: {
+        name,
+        rowCount: inner.result.length,
+        isDerived: true,
+        derivationHistory,
+        derivedFromSources: _collectSourceNames(ast.nested),
+        fullCommand: ast.raw
+      }
     };
   }
 
+  const sourceName = ast.args[0].replace(/"/g, '');
   const records = _resolveSource(ast.args[0], context);
+
+  // Even for a direct source reference, capture the snapshot provenance
+  const name = ast.args.length > 1 ? ast.args[1].replace(/"/g, '') : null;
+  if (name) {
+    context.sources[name] = records;
+    return {
+      result: records,
+      summary: `Snapshot of "${sourceName}" saved as "${name}" (${records.length} rows)`,
+      op: 'INS',
+      meta: {
+        name,
+        rowCount: records.length,
+        isDerived: true,
+        derivationHistory: [{ op: 'INS', command: ast.raw, description: `Snapshot of ${sourceName}` }],
+        derivedFromSources: [sourceName],
+        fullCommand: ast.raw
+      }
+    };
+  }
+
   return {
     result: records,
     summary: `Source loaded: ${records.length} rows`,
     op: 'INS',
     meta: { rowCount: records.length }
   };
+}
+
+/**
+ * Recursively collect the derivation history from nested EOQL commands.
+ * Returns an array of { op, command, description } entries tracing the full transformation chain.
+ */
+function _collectDerivationHistory(ast, context) {
+  const history = [];
+
+  if (ast.nested) {
+    history.push(..._collectDerivationHistory(ast.nested, context));
+  }
+
+  history.push({
+    op: ast.op,
+    command: ast.raw,
+    args: ast.args,
+    description: `${ast.op}(${ast.args.join(', ')})`
+  });
+
+  return history;
+}
+
+/**
+ * Recursively collect original source names referenced in the EOQL command tree.
+ */
+function _collectSourceNames(ast) {
+  const names = new Set();
+
+  if (ast.nested) {
+    for (const name of _collectSourceNames(ast.nested)) {
+      names.add(name);
+    }
+  } else if (ast.args.length > 0) {
+    // First arg is typically a source name (unless it's a nested command)
+    const firstName = ast.args[0].replace(/"/g, '').trim();
+    if (firstName && !firstName.match(/^[A-Z]+\s*\(/)) {
+      names.add(firstName);
+    }
+  }
+
+  // For CON/SUP, second arg is also a source
+  if ((ast.op === 'CON' || ast.op === 'SUP') && ast.args.length > 1) {
+    const secondName = ast.args[1].replace(/"/g, '').trim();
+    if (secondName && !secondName.match(/^[A-Z]+\s*\(/)) {
+      names.add(secondName);
+    }
+  }
+
+  return [...names];
 }
 
 function _execSUP(ast, context) {

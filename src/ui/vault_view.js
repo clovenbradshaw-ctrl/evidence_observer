@@ -4,7 +4,7 @@
  * INS(△) anchors displayed with immutable visual treatment.
  */
 
-import { getAllSources, getSource, getAnchors } from '../models/given_log.js';
+import { getAllSources, getSource, getAnchors, getDerivedSources } from '../models/given_log.js';
 import { ins_ingest, getSourceData } from '../given/service.js';
 import { formatOperator, NullState, OPERATORS } from '../models/operators.js';
 import { renderDataTable, renderMiniTable, renderDropzone, renderModal, html, toast } from './components.js';
@@ -107,9 +107,20 @@ function _renderSourceCard(source) {
   const card = document.createElement('div');
   card.className = `source-card ${source.id === _selectedSourceId ? 'selected' : ''}`;
 
+  const nameRow = document.createElement('div');
+  nameRow.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
   const name = document.createElement('div');
   name.className = 'source-name';
   name.textContent = source.filename;
+  nameRow.appendChild(name);
+
+  if (source.derived_from) {
+    const derivedBadge = document.createElement('span');
+    derivedBadge.style.cssText = 'font-size: 0.68rem; padding: 1px 6px; background: var(--primary); color: white; border-radius: 4px; white-space: nowrap;';
+    derivedBadge.textContent = 'derived';
+    nameRow.appendChild(derivedBadge);
+  }
 
   const meta = document.createElement('div');
   meta.className = 'source-meta';
@@ -122,6 +133,23 @@ function _renderSourceCard(source) {
   date.textContent = `Ingested ${new Date(source.ingested_at).toLocaleDateString()}`;
   meta.appendChild(date);
 
+  if (source.derived_from) {
+    const parentSource = getSource(source.derived_from);
+    if (parentSource) {
+      const lineage = document.createElement('span');
+      lineage.style.cssText = 'font-size: 0.72rem; color: var(--primary);';
+      lineage.textContent = `Derived from: ${parentSource.filename}`;
+      meta.appendChild(lineage);
+    }
+  }
+
+  if (source.source_description && source.derived_from) {
+    const descEl = document.createElement('span');
+    descEl.style.cssText = 'font-size: 0.72rem; color: var(--text-muted); font-style: italic;';
+    descEl.textContent = source.source_description;
+    meta.appendChild(descEl);
+  }
+
   if (source.sha256_hash) {
     const sha = document.createElement('span');
     sha.style.cssText = "font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;";
@@ -129,7 +157,7 @@ function _renderSourceCard(source) {
     meta.appendChild(sha);
   }
 
-  card.appendChild(name);
+  card.appendChild(nameRow);
   card.appendChild(meta);
 
   card.addEventListener('click', () => {
@@ -160,7 +188,9 @@ function _renderSchemaPanel(panel, source) {
   const tabBar = document.createElement('div');
   tabBar.className = 'schema-tabs';
 
-  const tabs = ['Schema', 'Nulls', 'Preview'];
+  const tabs = source.derived_from
+    ? ['Schema', 'Nulls', 'Preview', 'Derivation']
+    : ['Schema', 'Nulls', 'Preview'];
   for (const tabName of tabs) {
     const btn = document.createElement('button');
     btn.className = `schema-tab ${tabName.toLowerCase() === activeTab ? 'active' : ''}`;
@@ -191,6 +221,8 @@ function _renderTabContent(container, source, schema, provenance, tab) {
     _renderNullsTab(container, provenance);
   } else if (tab === 'preview') {
     _renderPreviewTab(container, source, schema);
+  } else if (tab === 'derivation') {
+    _renderDerivationTab(container, source, provenance);
   }
 }
 
@@ -287,6 +319,120 @@ async function _renderPreviewTab(container, source, schema) {
     }
   } catch (e) {
     container.innerHTML = '<div style="color: var(--text-muted);">Failed to load data preview</div>';
+  }
+}
+
+function _renderDerivationTab(container, source, provenance) {
+  if (!source.derived_from) {
+    container.innerHTML = '<div style="color: var(--text-muted);">This is an original source, not derived.</div>';
+    return;
+  }
+
+  // Show derivation lineage
+  const lineageSection = document.createElement('div');
+  lineageSection.style.cssText = 'margin-bottom: 16px;';
+
+  const lineageTitle = document.createElement('div');
+  lineageTitle.style.cssText = 'font-weight: 600; font-size: 0.85rem; margin-bottom: 8px; color: var(--text-primary);';
+  lineageTitle.textContent = 'Derivation Lineage';
+  lineageSection.appendChild(lineageTitle);
+
+  // Walk the chain of derived_from references
+  const chain = [];
+  let current = source;
+  while (current) {
+    chain.unshift(current);
+    if (current.derived_from) {
+      current = getSource(current.derived_from);
+    } else {
+      current = null;
+    }
+  }
+
+  for (let i = 0; i < chain.length; i++) {
+    const entry = chain[i];
+    const isLast = i === chain.length - 1;
+    const step = document.createElement('div');
+    step.style.cssText = `padding: 8px 12px; border-left: 2px solid ${isLast ? 'var(--primary)' : 'var(--border)'}; margin-left: 8px; margin-bottom: 4px; ${isLast ? 'background: var(--bg-secondary); border-radius: 0 6px 6px 0;' : ''}`;
+
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = `font-size: 0.85rem; font-weight: ${isLast ? '600' : '400'};`;
+    nameEl.textContent = entry.filename;
+    step.appendChild(nameEl);
+
+    const metaEl = document.createElement('div');
+    metaEl.style.cssText = 'font-size: 0.75rem; color: var(--text-muted);';
+    metaEl.textContent = `${entry.row_count} rows \u00b7 ${new Date(entry.ingested_at).toLocaleString()}`;
+    step.appendChild(metaEl);
+
+    if (entry.source_description && entry.derived_from) {
+      const descEl = document.createElement('div');
+      descEl.style.cssText = 'font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; font-style: italic;';
+      descEl.textContent = entry.source_description;
+      step.appendChild(descEl);
+    }
+
+    if (i < chain.length - 1) {
+      const arrow = document.createElement('div');
+      arrow.style.cssText = 'margin-left: 16px; color: var(--text-muted); font-size: 0.75rem;';
+      arrow.textContent = '\u2193';
+      lineageSection.appendChild(step);
+      lineageSection.appendChild(arrow);
+    } else {
+      lineageSection.appendChild(step);
+    }
+  }
+
+  container.appendChild(lineageSection);
+
+  // Show EOQL command from the source description if present
+  if (source.source_description) {
+    const cmdSection = document.createElement('div');
+    cmdSection.style.cssText = 'margin-top: 12px;';
+
+    const cmdTitle = document.createElement('div');
+    cmdTitle.style.cssText = 'font-weight: 600; font-size: 0.85rem; margin-bottom: 8px; color: var(--text-primary);';
+    cmdTitle.textContent = 'EOQL Command';
+    cmdSection.appendChild(cmdTitle);
+
+    const cmdBlock = document.createElement('div');
+    cmdBlock.style.cssText = "padding: 8px 12px; background: var(--bg-secondary); border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; word-break: break-all;";
+    // Extract the EOQL command from the description
+    const eoqlMatch = source.source_description.match(/EOQL:\s*(.+)$/);
+    cmdBlock.textContent = eoqlMatch ? eoqlMatch[1] : source.source_description;
+    cmdSection.appendChild(cmdBlock);
+
+    container.appendChild(cmdSection);
+  }
+
+  // Show the ingestion pipeline from provenance
+  if (provenance.ingestionPipeline) {
+    const pipeSection = document.createElement('div');
+    pipeSection.style.cssText = 'margin-top: 12px;';
+
+    const pipeTitle = document.createElement('div');
+    pipeTitle.style.cssText = 'font-weight: 600; font-size: 0.85rem; margin-bottom: 8px; color: var(--text-primary);';
+    pipeTitle.textContent = 'Ingestion Pipeline';
+    pipeSection.appendChild(pipeTitle);
+
+    const pipeList = document.createElement('div');
+    pipeList.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center;';
+    for (let i = 0; i < provenance.ingestionPipeline.length; i++) {
+      const step = provenance.ingestionPipeline[i];
+      const badge = document.createElement('span');
+      badge.style.cssText = 'padding: 2px 8px; background: var(--bg-secondary); border-radius: 4px; font-size: 0.78rem;';
+      badge.textContent = step;
+      pipeList.appendChild(badge);
+
+      if (i < provenance.ingestionPipeline.length - 1) {
+        const arrow = document.createElement('span');
+        arrow.style.cssText = 'color: var(--text-muted); font-size: 0.78rem;';
+        arrow.textContent = '\u2192';
+        pipeList.appendChild(arrow);
+      }
+    }
+    pipeSection.appendChild(pipeList);
+    container.appendChild(pipeSection);
   }
 }
 
