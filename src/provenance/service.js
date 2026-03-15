@@ -13,6 +13,7 @@ import { getSessionSteps, getStepOutputs, getStep } from '../models/meant_graph.
 import { getSource, getAnchors } from '../models/given_log.js';
 import { OPERATORS, formatOperator } from '../models/operators.js';
 import { generateNotation } from '../meant/notation.js';
+import { getIngestionEvents, describeIngestionEvent } from '../models/ingestion_events.js';
 
 /**
  * Generate audit entries for all steps in a session.
@@ -72,7 +73,8 @@ export function traceProvenance(stepId) {
       filename: source.filename,
       hash: source.sha256_hash,
       rowCount: source.row_count,
-      ingestedAt: source.ingested_at
+      ingestedAt: source.ingested_at,
+      ingestionTrail: getIngestionAuditTrail(source.id)
     })),
     isGrounded: givenSources.length > 0,
     chainLength: chain.length
@@ -136,6 +138,30 @@ export function drillDown(stepId, rowIndex) {
     givenSources: sourceRows,
     isGrounded: provenance.isGrounded
   };
+}
+
+/**
+ * Get the full ingestion audit trail for a Given-Log source.
+ * Returns every pipeline event with human-readable descriptions.
+ *
+ * @param {string} sourceId - Given-Log source ID
+ * @returns {Object[]} Array of described ingestion events
+ */
+export function getIngestionAuditTrail(sourceId) {
+  const events = getIngestionEvents(sourceId);
+  return events.map(event => {
+    const described = describeIngestionEvent(event);
+    return {
+      id: event.id,
+      sourceId: event.source_id,
+      eventType: event.event_type,
+      occurredAt: event.occurred_at,
+      ...described,
+      rawData: event.event_data_json
+        ? (typeof event.event_data_json === 'string' ? JSON.parse(event.event_data_json) : event.event_data_json)
+        : null
+    };
+  });
 }
 
 /**

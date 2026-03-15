@@ -6,9 +6,10 @@
  */
 
 import { getAllSessions, getSessionSteps, getStepOutputs } from '../models/meant_graph.js';
+import { getAllSources } from '../models/given_log.js';
 import { OPERATORS, formatOperator, formatOperatorFriendly } from '../models/operators.js';
 import { renderTechnicalView, renderPublicView } from '../provenance/views.js';
-import { traceProvenance, drillDown, checkMeantConformance } from '../provenance/service.js';
+import { traceProvenance, drillDown, checkMeantConformance, getIngestionAuditTrail } from '../provenance/service.js';
 import { renderDataTable, createOpBadge, getTriadClass, html, toast } from './components.js';
 import { updateTopBar } from '../app.js';
 
@@ -18,13 +19,14 @@ export function renderAuditView(container) {
   container.innerHTML = '';
 
   const sessions = getAllSessions();
+  const sources = getAllSources();
 
-  if (sessions.length === 0) {
-    updateTopBar('Audit Trail', 'No sessions');
+  if (sessions.length === 0 && sources.length === 0) {
+    updateTopBar('Audit Trail', 'No activity');
     container.appendChild(html`
       <div class="empty-state">
         <div class="empty-icon"><i class="ph ph-fingerprint" style="font-size: 3rem;"></i></div>
-        <p>No sessions to audit.</p>
+        <p>No activity to audit. Upload data to begin.</p>
       </div>
     `);
     return;
@@ -33,7 +35,7 @@ export function renderAuditView(container) {
   const view = html`<div></div>`;
 
   // Session selector (if multiple sessions)
-  let selectedSessionId = sessions[0].id;
+  let selectedSessionId = sessions.length > 0 ? sessions[0].id : null;
 
   if (sessions.length > 1) {
     const selectGroup = document.createElement('div');
@@ -101,33 +103,141 @@ export function renderAuditView(container) {
 function _renderAuditContent(container, sessionId) {
   container.innerHTML = '';
 
+  // ── Ingestion events: show the INS upload trail for all sources used ──
+  const sources = getAllSources();
+  if (sources.length > 0) {
+    _renderIngestionSection(container, sources);
+  }
+
   // Conformance check
-  const conformance = checkMeantConformance(sessionId);
-  if (!conformance.conformant) {
-    const warning = document.createElement('div');
-    warning.className = 'finding-card severity-high';
-    warning.style.marginBottom = '16px';
+  if (sessionId) {
+    const conformance = checkMeantConformance(sessionId);
+    if (!conformance.conformant) {
+      const warning = document.createElement('div');
+      warning.className = 'finding-card severity-high';
+      warning.style.marginBottom = '16px';
 
-    let warningHTML = '<div class="finding-header"><span class="finding-title">Validation Issues</span><span class="severity-badge high">Warning</span></div>';
-    warningHTML += '<div class="finding-body">';
-    for (const v of conformance.violations) {
-      warningHTML += `${v.operator}: ${v.violation} \u2014 ${v.message}<br>`;
+      let warningHTML = '<div class="finding-header"><span class="finding-title">Validation Issues</span><span class="severity-badge high">Warning</span></div>';
+      warningHTML += '<div class="finding-body">';
+      for (const v of conformance.violations) {
+        warningHTML += `${v.operator}: ${v.violation} \u2014 ${v.message}<br>`;
+      }
+      warningHTML += '</div>';
+      warning.innerHTML = warningHTML;
+      container.appendChild(warning);
     }
-    warningHTML += '</div>';
-    warning.innerHTML = warningHTML;
-    container.appendChild(warning);
+
+    // Steps as thread
+    const steps = getSessionSteps(sessionId);
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      if (step.status === 'pending') continue;
+
+      const isLast = (i === steps.length - 1);
+      container.appendChild(_renderAuditRow(step, isLast, sessionId));
+    }
+  }
+}
+
+/**
+ * Render the ingestion audit trail section — shows every INS upload pipeline event.
+ */
+function _renderIngestionSection(container, sources) {
+  const sectionHeader = document.createElement('div');
+  sectionHeader.style.cssText = 'font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border);';
+  sectionHeader.textContent = `Data Ingestion \u2014 INS(\u25B3) Pipeline`;
+  container.appendChild(sectionHeader);
+
+  for (const source of sources) {
+    const trail = getIngestionAuditTrail(source.id);
+    if (trail.length === 0) continue;
+
+    // Source header
+    const sourceHeader = document.createElement('div');
+    sourceHeader.style.cssText = 'font-size: 0.85rem; font-weight: 600; margin: 12px 0 8px; display: flex; align-items: center; gap: 8px;';
+
+    const badge = document.createElement('span');
+    badge.style.cssText = 'background: var(--given-bg, #e8f5e9); color: var(--given-border, #388e3c); padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em;';
+    badge.textContent = 'INS(\u25B3)';
+    sourceHeader.appendChild(badge);
+
+    const nameText = document.createTextNode(source.filename);
+    sourceHeader.appendChild(nameText);
+
+    container.appendChild(sourceHeader);
+
+    // Render each ingestion event
+    for (let i = 0; i < trail.length; i++) {
+      const event = trail[i];
+      const isLast = (i === trail.length - 1);
+      container.appendChild(_renderIngestionEventRow(event, isLast));
+    }
   }
 
-  // Steps as thread
-  const steps = getSessionSteps(sessionId);
+  // Divider before session steps
+  const divider = document.createElement('div');
+  divider.style.cssText = 'font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin: 20px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border);';
+  divider.textContent = 'Analysis Steps';
+  container.appendChild(divider);
+}
 
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i];
-    if (step.status === 'pending') continue;
+/**
+ * Render a single ingestion event row in the audit thread.
+ */
+function _renderIngestionEventRow(event, isLast) {
+  const row = document.createElement('div');
+  row.className = 'audit-row';
 
-    const isLast = (i === steps.length - 1);
-    container.appendChild(_renderAuditRow(step, isLast, sessionId));
+  // ── Left: colored line ──
+  const lineContainer = document.createElement('div');
+  lineContainer.className = 'audit-line-container';
+
+  const dot = document.createElement('div');
+  dot.className = 'audit-line-dot completed';
+  dot.style.cssText = event.eventType === 'ingestion_failed'
+    ? 'background: var(--failed-border);'
+    : event.eventType === 'duplicate_detected'
+      ? 'background: var(--stale-border);'
+      : '';
+  lineContainer.appendChild(dot);
+
+  if (!isLast) {
+    const bar = document.createElement('div');
+    bar.className = 'audit-line-bar completed';
+    lineContainer.appendChild(bar);
   }
+
+  row.appendChild(lineContainer);
+
+  // ── Right: content ──
+  const content = document.createElement('div');
+  content.className = 'audit-content';
+
+  // Header: glyph + event type
+  const header = document.createElement('div');
+  header.className = 'audit-step-header';
+  header.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+
+  const glyphEl = document.createElement('span');
+  glyphEl.style.cssText = 'font-size: 0.9rem; opacity: 0.7;';
+  glyphEl.textContent = event.glyph;
+  header.appendChild(glyphEl);
+
+  const desc = document.createElement('span');
+  desc.textContent = _viewMode === 'public' ? event.public : event.technical;
+  header.appendChild(desc);
+
+  content.appendChild(header);
+
+  // Timestamp
+  const timestamp = document.createElement('div');
+  timestamp.style.cssText = 'font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;';
+  timestamp.textContent = new Date(event.occurredAt).toLocaleString();
+  content.appendChild(timestamp);
+
+  row.appendChild(content);
+  return row;
 }
 
 function _renderAuditRow(step, isLast, sessionId) {
@@ -318,7 +428,7 @@ function _showInlineDrillDown(parentDiv, stepId, rowIndex) {
     }
   }
 
-  // Given-Log sources
+  // Given-Log sources with ingestion trail
   if (result.givenSources.length > 0) {
     const sourceLabel = document.createElement('div');
     sourceLabel.style.cssText = 'font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; margin: 8px 0 4px;';
@@ -326,11 +436,44 @@ function _showInlineDrillDown(parentDiv, stepId, rowIndex) {
     detail.appendChild(sourceLabel);
 
     for (const source of result.givenSources) {
-      detail.appendChild(html`
-        <div style="font-size: 0.82rem; padding: 4px 12px; background: var(--given-bg); border-left: 2px solid var(--given-border); margin-bottom: 4px; border-radius: 0 4px 4px 0;">
+      const sourceDiv = html`
+        <div style="font-size: 0.82rem; padding: 4px 12px; background: var(--given-bg); border-left: 2px solid var(--given-border); margin-bottom: 4px; border-radius: 0 4px 4px 0; cursor: pointer;">
           ${source.source}
         </div>
-      `);
+      `;
+
+      // Click to expand ingestion trail inline
+      sourceDiv.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const existing = sourceDiv.querySelector('.ingestion-trail-detail');
+        if (existing) {
+          existing.remove();
+          return;
+        }
+
+        const trail = getIngestionAuditTrail(source.sourceId);
+        if (trail.length === 0) return;
+
+        const trailDiv = document.createElement('div');
+        trailDiv.className = 'ingestion-trail-detail';
+        trailDiv.style.cssText = 'margin-top: 6px; padding-left: 8px; border-left: 1px solid var(--border);';
+
+        const trailLabel = document.createElement('div');
+        trailLabel.style.cssText = 'font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;';
+        trailLabel.textContent = 'Ingestion Pipeline Trail';
+        trailDiv.appendChild(trailLabel);
+
+        for (const event of trail) {
+          const eventEl = document.createElement('div');
+          eventEl.style.cssText = 'font-size: 0.78rem; padding: 2px 0; color: var(--text-secondary);';
+          eventEl.textContent = `${event.glyph} ${_viewMode === 'public' ? event.public : event.technical}`;
+          trailDiv.appendChild(eventEl);
+        }
+
+        sourceDiv.appendChild(trailDiv);
+      });
+
+      detail.appendChild(sourceDiv);
     }
   }
 

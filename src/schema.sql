@@ -137,6 +137,20 @@ CREATE TABLE IF NOT EXISTS branch_states (
 
 -- ============ PROVENANCE π — Audit Trail ============
 
+-- Ingestion events — tracks every step of the INS(△) upload pipeline
+CREATE TABLE IF NOT EXISTS ingestion_events (
+  id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL,
+  event_type TEXT NOT NULL CHECK(event_type IN (
+    'upload_started', 'hash_computed', 'duplicate_detected',
+    'sig_parse_complete', 'nul_audit_complete',
+    'storage_decided', 'source_created', 'anchors_created',
+    'ingestion_complete', 'ingestion_failed'
+  )),
+  event_data_json TEXT,
+  occurred_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit_entries (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES sessions(id),
@@ -147,6 +161,15 @@ CREATE TABLE IF NOT EXISTS audit_entries (
   custom_description TEXT,
   generated_at TEXT NOT NULL
 );
+
+-- Ingestion events are append-only
+CREATE TRIGGER IF NOT EXISTS no_update_ingestion_events
+  BEFORE UPDATE ON ingestion_events
+  BEGIN SELECT RAISE(ABORT, 'Gaslighting: Ingestion events are append-only'); END;
+
+CREATE TRIGGER IF NOT EXISTS no_delete_ingestion_events
+  BEFORE DELETE ON ingestion_events
+  BEGIN SELECT RAISE(ABORT, 'Gaslighting: Ingestion events are append-only'); END;
 
 -- Provenance is append-only (EO Rule 7: Groundedness)
 CREATE TRIGGER IF NOT EXISTS no_update_audit
@@ -164,5 +187,6 @@ CREATE INDEX IF NOT EXISTS idx_steps_session ON steps(session_id);
 CREATE INDEX IF NOT EXISTS idx_step_outputs_step ON step_outputs(step_id);
 CREATE INDEX IF NOT EXISTS idx_reconciliation_step ON reconciliation_decisions(step_id);
 CREATE INDEX IF NOT EXISTS idx_branch_states_step ON branch_states(step_id);
+CREATE INDEX IF NOT EXISTS idx_ingestion_events_source ON ingestion_events(source_id);
 CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_entries(session_id);
 CREATE INDEX IF NOT EXISTS idx_audit_step ON audit_entries(step_id);
