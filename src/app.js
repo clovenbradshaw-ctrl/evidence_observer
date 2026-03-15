@@ -12,18 +12,20 @@ import { renderDAGView } from './ui/dag_view.js';
 import { renderAuditView } from './ui/audit_view.js';
 import { renderExportView } from './ui/export_view.js';
 import { renderAIView } from './ui/ai_view.js';
+import { renderValidationView } from './ui/validation_view.js';
 import { OPERATORS, HELIX_ORDER } from './models/operators.js';
 
 let currentView = 'vault';
 
 const VIEWS = {
-  vault:    { label: 'Sources',       icon: 'ph ph-vault',          render: renderVaultView },
-  session:  { label: 'Workbook',      icon: 'ph ph-graph',          render: renderSessionView },
-  horizon:  { label: 'Perspectives',  icon: 'ph ph-binoculars',     render: renderHorizonView },
-  ai:       { label: 'AI Analysis',   icon: 'ph ph-sparkle',        render: renderAIView },
-  dag:      { label: 'Lineage',       icon: 'ph ph-flow-arrow',     render: renderDAGView },
-  audit:    { label: 'Audit Trail',   icon: 'ph ph-fingerprint',    render: renderAuditView },
-  export:   { label: 'Export',         icon: 'ph ph-export',         render: renderExportView }
+  vault:      { label: 'Sources',         icon: 'ph ph-vault',          render: renderVaultView },
+  session:    { label: 'Workbook',       icon: 'ph ph-graph',          render: renderSessionView },
+  validation: { label: 'Audit Dashboard', icon: 'ph ph-check-square',  render: renderValidationView },
+  horizon:    { label: 'Perspectives',   icon: 'ph ph-binoculars',     render: renderHorizonView },
+  ai:         { label: 'AI Analysis',    icon: 'ph ph-sparkle',        render: renderAIView },
+  dag:        { label: 'Lineage',        icon: 'ph ph-flow-arrow',     render: renderDAGView },
+  audit:      { label: 'Audit Trail',    icon: 'ph ph-fingerprint',    render: renderAuditView },
+  export:     { label: 'Export',          icon: 'ph ph-export',         render: renderExportView }
 };
 
 /**
