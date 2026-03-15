@@ -5,7 +5,7 @@
 
 import { getAllSessions } from '../models/meant_graph.js';
 import { getAllSources } from '../models/given_log.js';
-import { OPERATORS, formatOperator } from '../models/operators.js';
+import { OPERATORS, formatOperator, formatOperatorFriendly } from '../models/operators.js';
 import { startSession, addStep, executeStep, getSessionChain } from '../meant/service.js';
 import { renderOperatorSelector, renderHelixBar, renderDataTable, renderModal, html, toast } from './components.js';
 
@@ -22,7 +22,7 @@ export function renderSessionView(container) {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
           <i class="ph ph-graph" style="color: var(--meant-border); font-size: 1.3rem;"></i>
-          Meant-Graph
+          Workbook
         </h2>
         <button class="btn btn-primary" id="btn-new-session"><i class="ph ph-plus"></i> New Session</button>
       </div>
@@ -56,7 +56,7 @@ function _renderSessionList(container) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon"><i class="ph ph-graph" style="font-size: 3rem;"></i></div>
-        <p>No analysis sessions yet.<br>Create a session to begin building the Meant-Graph.</p>
+        <p>No analysis sessions yet.<br>Create a session to begin your analysis.</p>
       </div>
     `;
     return;
@@ -104,7 +104,7 @@ function _renderActiveSession(container, sessionId) {
   const usedOps = new Set(chain.map(s => s.operator_type));
   const helixBar = renderHelixBar();
   helixBar.querySelectorAll('.helix-step').forEach(el => {
-    const code = el.textContent.trim().split(' ')[1];
+    const code = el.dataset.operator;
     if (usedOps.has(code)) {
       el.classList.add('active');
     }
@@ -140,7 +140,7 @@ function _renderStepCard(step, container, sessionId) {
         <span class="op-glyph ${op.triad.toLowerCase()}">${op.glyph}</span>
         <div style="flex: 1;">
           <div class="card-title">
-            Step ${step.sequence_number}: ${formatOperator(step.operator_type)} — ${step.description}
+            Step ${step.sequence_number}: ${formatOperatorFriendly(step.operator_type)} — ${step.description}
           </div>
           <div style="font-size: 0.8rem; color: var(--text-muted);">
             ${op.verb} · Status: <span class="status-${step.status}">${step.status}</span>
@@ -192,14 +192,14 @@ function _showNewSessionModal(container) {
       <div class="form-group">
         <label class="form-label">Mode</label>
         <select class="form-select" id="session-mode">
-          <option value="explore">Explore — helix violations warned, not blocked</option>
-          <option value="confirm">Confirm — helix violations block export</option>
+          <option value="explore">Explore — ordering issues warned, not blocked</option>
+          <option value="confirm">Confirm — ordering issues block export</option>
         </select>
       </div>
     </div>
   `;
 
-  renderModal(`${OPERATORS.ALT.glyph} New Analysis Session`, form, [
+  renderModal('New Analysis Session', form, [
     { label: 'Cancel' },
     {
       label: 'Create Session',
@@ -228,7 +228,7 @@ function _showAddStepModal(sessionId, container) {
   const form = html`<div></div>`;
 
   // Operator selector
-  const opLabel = html`<div class="form-group"><label class="form-label">Operator Type (Helix Position)</label></div>`;
+  const opLabel = html`<div class="form-group"><label class="form-label">Operation Type</label></div>`;
   const opSelector = renderOperatorSelector((code) => { selectedOp = code; });
   opLabel.appendChild(opSelector);
   form.appendChild(opLabel);
@@ -254,7 +254,7 @@ function _showAddStepModal(sessionId, container) {
   for (const source of sources) {
     const opt = document.createElement('option');
     opt.value = source.id;
-    opt.textContent = `[Given] ${OPERATORS.INS.glyph} ${source.filename} (${source.row_count} rows)`;
+    opt.textContent = `[Source] ${source.filename} (${source.row_count} rows)`;
     inputSelect.appendChild(opt);
   }
 
@@ -265,7 +265,7 @@ function _showAddStepModal(sessionId, container) {
       for (const output of step.outputs) {
         const opt = document.createElement('option');
         opt.value = step.id;
-        opt.textContent = `[Step ${step.sequence_number}] ${OPERATORS[step.operator_type].glyph} ${output.name} (${output.row_count || '?'} rows)`;
+        opt.textContent = `[Step ${step.sequence_number}] ${OPERATORS[step.operator_type].friendlyName} — ${output.name} (${output.row_count || '?'} rows)`;
         inputSelect.appendChild(opt);
       }
     }
@@ -285,7 +285,7 @@ result = campaign_finance[campaign_finance['district'] == 'District 1']"></texta
     </div>
   `);
 
-  renderModal(`Add Step to Meant-Graph`, form, [
+  renderModal('Add Step', form, [
     { label: 'Cancel' },
     {
       label: 'Add & Execute',
@@ -315,13 +315,13 @@ result = campaign_finance[campaign_finance['district'] == 'District 1']"></texta
           }
 
           // Execute
-          toast(`Executing ${formatOperator(selectedOp)}...`, 'info');
+          toast(`Executing ${formatOperatorFriendly(selectedOp)}...`, 'info');
           const result = await executeStep(stepId);
 
           if (result.success) {
-            toast(`${formatOperator(selectedOp)} completed: ${result.executionLog.rowsOut} rows`, 'success');
+            toast(`${formatOperatorFriendly(selectedOp)} completed: ${result.executionLog.rowsOut} rows`, 'success');
           } else {
-            toast(`${formatOperator(selectedOp)} failed: ${result.error}`, 'error');
+            toast(`${formatOperatorFriendly(selectedOp)} failed: ${result.error}`, 'error');
           }
 
           _renderActiveSession(container, sessionId);
@@ -341,9 +341,9 @@ function _showStepDetail(step, sessionId, container) {
   content.appendChild(html`
     <div style="margin-bottom: 16px;">
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem;">
-        <div><strong>Operator:</strong> ${formatOperator(step.operator_type)} (${op.verb})</div>
+        <div><strong>Operation:</strong> ${op.friendlyName} (${op.code})</div>
         <div><strong>Status:</strong> <span class="status-${step.status}">${step.status}</span></div>
-        <div><strong>Triad:</strong> ${op.triad}</div>
+        <div><strong>Category:</strong> ${op.triad}</div>
         <div><strong>Role:</strong> ${op.role}</div>
       </div>
     </div>
@@ -364,7 +364,7 @@ function _showStepDetail(step, sessionId, container) {
     const notationText = typeof step.notation === 'string' ? step.notation : (step.notation.text || JSON.stringify(step.notation, null, 2));
     content.appendChild(html`
       <div class="form-group">
-        <label class="form-label">${op.glyph} EO Notation (auto-generated)</label>
+        <label class="form-label">Formal Notation</label>
         <pre class="notation">${notationText}</pre>
       </div>
     `);
@@ -401,7 +401,7 @@ function _showStepDetail(step, sessionId, container) {
     }
   }
 
-  renderModal(`Step ${step.sequence_number}: ${formatOperator(step.operator_type)}`, content, [
+  renderModal(`Step ${step.sequence_number}: ${formatOperatorFriendly(step.operator_type)}`, content, [
     { label: 'Close' }
   ]);
 }

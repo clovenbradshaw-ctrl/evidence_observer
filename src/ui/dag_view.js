@@ -24,7 +24,7 @@ export function renderDAGView(container) {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
           <i class="ph ph-flow-arrow" style="color: var(--accent); font-size: 1.3rem;"></i>
-          DAG
+          Lineage
         </h2>
       </div>
     </div>
@@ -310,5 +310,5 @@ function _highlightProvenance(svg, nodeId, nodes, edges, positions) {
     }
   });
 
-  toast(`π provenance: ${upstream.size} nodes in chain`, 'info');
+  toast(`Lineage: ${upstream.size} steps in chain`, 'info');
 }

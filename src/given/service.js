@@ -69,7 +69,7 @@ export async function ins_ingest(file, options = {}) {
       status: 'duplicate',
       existingId,
       hash,
-      message: `SIG(⊡): File already exists in Given-Log with identical hash`
+      message: `File already exists with identical hash`
     };
   }
 

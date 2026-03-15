@@ -58,7 +58,7 @@ export function renderExportView(container) {
           <div class="card-title"><i class="ph ph-file-code" style="color: var(--accent);"></i> Notation Package</div>
           <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
             JSON with full step sequence, notation, inputs, lens states.
-            Replayable given same Given sources.
+            Replayable with the same source data.
           </div>
         </div>
         <div class="card" style="cursor: pointer;" id="export-methodology">

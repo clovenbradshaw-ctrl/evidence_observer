@@ -31,11 +31,11 @@ export function renderHorizonView(container) {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
           <i class="ph ph-binoculars" style="color: var(--accent); font-size: 1.3rem;"></i>
-          Horizon
+          Perspectives
         </h2>
         <div style="display: flex; gap: 8px;">
-          <button class="btn btn-primary" id="btn-new-lens"><i class="ph ph-plus"></i> New Lens</button>
-          <button class="btn" id="btn-compose-horizon"><i class="ph ph-intersect"></i> Compose Horizon</button>
+          <button class="btn btn-primary" id="btn-new-lens"><i class="ph ph-plus"></i> New Filter</button>
+          <button class="btn" id="btn-compose-horizon"><i class="ph ph-intersect"></i> Compose Perspective</button>
         </div>
       </div>
     </div>
@@ -49,15 +49,15 @@ export function renderHorizonView(container) {
     view.appendChild(html`
       <div class="empty-state">
         <div class="empty-icon"><i class="ph ph-binoculars" style="font-size: 3rem;"></i></div>
-        <p>No lenses or horizons yet.<br>
-        Create a lens to cut the data space,<br>
-        then compose into a horizon.</p>
+        <p>No filters or perspectives yet.<br>
+        Create a filter to scope your data,<br>
+        then compose them into a perspective.</p>
       </div>
     `);
   } else {
     // Horizons
     if (horizons.length > 0) {
-      view.appendChild(html`<h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--text-secondary);"><i class="ph ph-intersect"></i> Composed Horizons</h3>`);
+      view.appendChild(html`<h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--text-secondary);"><i class="ph ph-intersect"></i> Composed Perspectives</h3>`);
       for (const horizon of horizons) {
         view.appendChild(_renderHorizonCard(horizon));
       }
@@ -65,7 +65,7 @@ export function renderHorizonView(container) {
 
     // Lenses
     if (lenses.length > 0) {
-      view.appendChild(html`<h3 style="font-size: 1rem; margin: 20px 0 12px; color: var(--text-secondary);"><i class="ph ph-funnel"></i> Individual Lenses</h3>`);
+      view.appendChild(html`<h3 style="font-size: 1rem; margin: 20px 0 12px; color: var(--text-secondary);"><i class="ph ph-funnel"></i> Individual Filters</h3>`);
       for (const lens of lenses) {
         if (!lens.parent_id) {
           view.appendChild(_renderLensCard(lens));
@@ -115,7 +115,7 @@ function _renderHorizonCard(horizon) {
       <div class="card-header">
         <span class="op-glyph structure">⋈</span>
         <div class="card-title">${horizon.name}</div>
-        <span style="font-size: 0.75rem; color: var(--text-muted);">${lensIds.length} lenses</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">${lensIds.length} filters</span>
       </div>
       <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap;">
         ${lensIds.map(id => {
@@ -188,13 +188,13 @@ function _showNewLensModal(parentContainer) {
     typeSelect.appendChild(opt);
   }
 
-  content.appendChild(html`<div style="margin-bottom: 8px;"><label style="font-size: 0.85rem;">Lens Type</label></div>`);
+  content.appendChild(html`<div style="margin-bottom: 8px;"><label style="font-size: 0.85rem;">Filter Type</label></div>`);
   content.appendChild(typeSelect);
 
   // Name field
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
-  nameInput.placeholder = 'Lens name';
+  nameInput.placeholder = 'Filter name';
   nameInput.className = 'form-input';
   nameInput.style.cssText = 'width: 100%; margin-bottom: 12px; padding: 8px; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 4px;';
   content.appendChild(html`<div style="margin-bottom: 4px;"><label style="font-size: 0.85rem;">Name</label></div>`);
@@ -235,7 +235,7 @@ function _showNewLensModal(parentContainer) {
   content.appendChild(html`<div style="margin-bottom: 4px; margin-top: 8px;"><label style="font-size: 0.85rem;">Created By (optional)</label></div>`);
   content.appendChild(createdByInput);
 
-  renderModal('SEG(|) Create Lens', content, [
+  renderModal('Create Filter', content, [
     {
       label: 'Create',
       primary: true,
@@ -261,7 +261,7 @@ function _showNewLensModal(parentContainer) {
           };
 
           creators[type]();
-          toast(`Lens "${name}" created`, 'success');
+          toast(`Filter "${name}" created`, 'success');
           renderHorizonView(parentContainer);
         } catch (err) {
           toast(err.message, 'error');
@@ -276,7 +276,7 @@ function _showComposeModal(parentContainer) {
   const lenses = getAllLenses().filter(l => !l.parent_id);
 
   if (lenses.length < 1) {
-    toast('Create at least one lens first', 'error');
+    toast('Create at least one filter first', 'error');
     return;
   }
 
@@ -285,14 +285,14 @@ function _showComposeModal(parentContainer) {
   // Name
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
-  nameInput.placeholder = 'Horizon name';
+  nameInput.placeholder = 'Perspective name';
   nameInput.className = 'form-input';
   nameInput.style.cssText = 'width: 100%; margin-bottom: 12px; padding: 8px; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 4px;';
-  content.appendChild(html`<div style="margin-bottom: 4px;"><label style="font-size: 0.85rem;">Horizon Name</label></div>`);
+  content.appendChild(html`<div style="margin-bottom: 4px;"><label style="font-size: 0.85rem;">Perspective Name</label></div>`);
   content.appendChild(nameInput);
 
   // Lens checkboxes
-  content.appendChild(html`<div style="margin-bottom: 4px;"><label style="font-size: 0.85rem;">Select Lenses to Compose</label></div>`);
+  content.appendChild(html`<div style="margin-bottom: 4px;"><label style="font-size: 0.85rem;">Select Filters to Compose</label></div>`);
 
   const checkboxContainer = document.createElement('div');
   checkboxContainer.style.cssText = 'max-height: 200px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 8px;';
@@ -306,7 +306,7 @@ function _showComposeModal(parentContainer) {
   }
   content.appendChild(checkboxContainer);
 
-  renderModal('CON(⋈) Compose Horizon', content, [
+  renderModal('Compose Perspective', content, [
     {
       label: 'Compose',
       primary: true,
@@ -323,7 +323,7 @@ function _showComposeModal(parentContainer) {
 
         try {
           composeHorizon({ name, lensIds: selectedIds });
-          toast(`Horizon "${name}" composed with ${selectedIds.length} lenses`, 'success');
+          toast(`Perspective "${name}" composed with ${selectedIds.length} filters`, 'success');
           renderHorizonView(parentContainer);
         } catch (err) {
           toast(err.message, 'error');

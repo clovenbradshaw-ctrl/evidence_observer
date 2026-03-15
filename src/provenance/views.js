@@ -8,7 +8,7 @@
  * If the step changes, the public view regenerates. They cannot diverge.
  */
 
-import { OPERATORS, formatOperator, Violations } from '../models/operators.js';
+import { OPERATORS, Violations } from '../models/operators.js';
 import { getSessionSteps, getStepOutputs } from '../models/meant_graph.js';
 import { getStepReconciliations } from '../models/reconciliation.js';
 import { getStepBranches } from '../models/superposition.js';
@@ -27,16 +27,16 @@ export function renderTechnicalView(step) {
 
   // Notation
   sections.push({
-    label: `${op.glyph} EO Notation`,
-    content: notation?.text || `${formatOperator(step.operator_type)}(${step.description})`
+    label: 'Formal Notation',
+    content: notation?.text || `${op.friendlyName}(${step.description})`
   });
 
   // Provenance citations
   if (provenance.givenSources.length > 0) {
     sections.push({
-      label: 'π Provenance',
+      label: 'Lineage',
       content: provenance.givenSources.map(s =>
-        `Given-Log: ${s.filename} (SHA-256: ${s.hash?.substring(0, 12)}…, ${s.rowCount} rows, ingested ${s.ingestedAt})`
+        `Source: ${s.filename} (SHA-256: ${s.hash?.substring(0, 12)}…, ${s.rowCount} rows, ingested ${s.ingestedAt})`
       ).join('\n')
     });
   }
@@ -44,11 +44,11 @@ export function renderTechnicalView(step) {
   // Rule citations
   const rules = [];
   if (provenance.isGrounded) {
-    rules.push('Rule 7 (Groundedness): ✓ All outputs trace to Given-Log');
+    rules.push('Groundedness: ✓ All outputs trace to original sources');
   } else {
-    rules.push(`Rule 7 (Groundedness): ✗ ${Violations.UngroundedAssertion}`);
+    rules.push('Groundedness: ✗ Cannot trace to original sources');
   }
-  sections.push({ label: 'Conformance Rules', content: rules.join('\n') });
+  sections.push({ label: 'Validation Rules', content: rules.join('\n') });
 
   // Execution statistics
   if (execLog) {
@@ -64,7 +64,7 @@ export function renderTechnicalView(step) {
   if (step.status === 'stale') {
     sections.push({
       label: 'Staleness',
-      content: '⚠ This step is STALE — a dependent lens or input has changed. Re-execute to update.'
+      content: '⚠ This step is STALE — a dependent filter or input has changed. Re-execute to update.'
     });
   }
 
@@ -139,7 +139,7 @@ export function renderPublicView(step) {
 
   return {
     stepNumber: step.sequence_number,
-    title: `Step ${step.sequence_number} — ${op.glyph} ${_operatorLabel(step.operator_type)}`,
+    title: `Step ${step.sequence_number} — ${op.friendlyName}`,
     description,
     outputSummary,
     canEdit: true // Analyst can customize public description
