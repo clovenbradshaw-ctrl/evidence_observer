@@ -90,15 +90,15 @@ export async function initDB(sqlPromise, schemaSQL) {
   const savedState = await idbGet(IDB_STORE_DB, 'current').catch(() => null);
 
   if (savedState) {
-    _db = new SQL.Database(new Uint8Array(savedState));
-    // Verify schema exists — apply if tables are missing (stale/corrupted state)
     try {
-      _db.exec("SELECT 1 FROM given_log LIMIT 0");
+      _db = new SQL.Database(new Uint8Array(savedState));
+      _db.exec(schemaSQL); // Always ensure schema is current (IF NOT EXISTS is safe)
       console.log('[db] Restored from IndexedDB');
     } catch (e) {
-      console.warn('[db] Restored DB missing schema, re-applying...');
+      console.warn('[db] Restored DB unusable, creating fresh:', e.message);
+      _db = new SQL.Database();
       _db.exec(schemaSQL);
-      console.log('[db] Schema applied to restored DB');
+      console.log('[db] Created fresh database (recovery)');
     }
   } else {
     _db = new SQL.Database();

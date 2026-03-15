@@ -21,7 +21,7 @@ export function renderVaultView(container) {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
           <i class="ph ph-vault" style="color: var(--given-border); font-size: 1.3rem;"></i>
-          Given-Log
+          Sources
         </h2>
         <span class="given-badge"><i class="ph ph-lock-simple" style="font-size: 0.7rem;"></i> Immutable</span>
       </div>
@@ -35,7 +35,7 @@ export function renderVaultView(container) {
       const result = await ins_ingest(file);
 
       if (result.status === 'duplicate') {
-        toast('Duplicate — this file is already in the Given-Log', 'error');
+        toast('Duplicate — this file has already been imported', 'error');
         return;
       }
 
@@ -74,7 +74,7 @@ function _renderSourceList(container) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon"><i class="ph ph-empty" style="font-size: 3rem;"></i></div>
-        <p>No sources in the Given-Log yet.<br>
+        <p>No data sources yet.<br>
         Upload a CSV or JSON file to begin.</p>
       </div>
     `;
@@ -83,7 +83,7 @@ function _renderSourceList(container) {
 
   const heading = html`
     <h3 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-secondary);">
-      ${sources.length} source${sources.length !== 1 ? 's' : ''} anchored
+      ${sources.length} source${sources.length !== 1 ? 's' : ''} imported
     </h3>
   `;
   container.appendChild(heading);
@@ -112,7 +112,7 @@ function _renderSourceCard(source) {
             · ${new Date(source.ingested_at).toLocaleDateString()}
           </div>
         </div>
-        <span class="given-badge"><i class="ph ph-lock-simple" style="font-size: 0.65rem;"></i> Given</span>
+        <span class="given-badge"><i class="ph ph-lock-simple" style="font-size: 0.65rem;"></i> Source</span>
       </div>
     </div>
   `;
@@ -146,7 +146,7 @@ async function _showSourceDetail(source) {
   // Schema section
   const schema = source.schema_json ? JSON.parse(source.schema_json) : [];
   if (schema.length > 0) {
-    const schemaSection = html`<div style="margin-bottom: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">SIG(⊡) Schema</h4></div>`;
+    const schemaSection = html`<div style="margin-bottom: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">Inferred Schema</h4></div>`;
     const schemaTable = renderDataTable(
       schema.map(s => ({
         Column: s.name,
@@ -164,24 +164,24 @@ async function _showSourceDetail(source) {
   // NUL(∅) Audit section
   const provenance = source.provenance_json ? JSON.parse(source.provenance_json) : {};
   if (provenance.nullAudit) {
-    const nullSection = html`<div style="margin-bottom: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">NUL(∅) Null Audit</h4></div>`;
+    const nullSection = html`<div style="margin-bottom: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">Null Value Audit</h4></div>`;
     const nullRows = Object.entries(provenance.nullAudit).map(([col, counts]) => ({
       Column: col,
       Populated: counts.populated,
-      'CLEARED (∅)': counts.CLEARED || 0,
-      'UNKNOWN (∅)': counts.UNKNOWN || 0,
-      'NEVER_SET (∅)': counts.NEVER_SET || 0
+      'Cleared': counts.CLEARED || 0,
+      'Unknown': counts.UNKNOWN || 0,
+      'Never Set': counts.NEVER_SET || 0
     }));
     const nullTable = renderDataTable(
       nullRows,
-      ['Column', 'Populated', 'CLEARED (∅)', 'UNKNOWN (∅)', 'NEVER_SET (∅)']
+      ['Column', 'Populated', 'Cleared', 'Unknown', 'Never Set']
     );
     nullSection.appendChild(nullTable);
     content.appendChild(nullSection);
   }
 
   // Data preview
-  const dataSection = html`<div><h4 style="font-size: 0.9rem; margin-bottom: 8px;">INS(△) Anchored Records (preview)</h4></div>`;
+  const dataSection = html`<div><h4 style="font-size: 0.9rem; margin-bottom: 8px;">Data Preview</h4></div>`;
 
   try {
     const data = JSON.parse(source.data_json);
@@ -213,7 +213,7 @@ async function _showSourceDetail(source) {
 
   content.appendChild(dataSection);
 
-  renderModal(`${OPERATORS.INS.glyph} ${source.filename}`, content, [
+  renderModal(source.filename, content, [
     { label: 'Close', onClick: () => {} }
   ]);
 }
@@ -227,7 +227,7 @@ function _showSchemaReview(result) {
   content.appendChild(html`
     <div style="margin-bottom: 16px;">
       <p style="color: var(--completed-border); margin-bottom: 8px;">
-        ${OPERATORS.INS.glyph} Successfully anchored ${result.rowCount} rows from ${result.filename}
+        Successfully imported ${result.rowCount} rows from ${result.filename}
       </p>
       <p style="font-size: 0.85rem; color: var(--text-secondary);">
         Review the inferred schema below. Override types if needed (e.g., FIPS codes should be strings, not numbers).
@@ -248,7 +248,7 @@ function _showSchemaReview(result) {
   content.appendChild(schemaTable);
 
   // Null audit summary
-  const nullSummary = html`<div style="margin-top: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">${OPERATORS.NUL.glyph} NUL Audit Summary</h4></div>`;
+  const nullSummary = html`<div style="margin-top: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">Null Value Summary</h4></div>`;
   const nullCols = Object.entries(result.nullAudit)
     .filter(([_, counts]) => counts.CLEARED > 0 || counts.UNKNOWN > 0 || counts.NEVER_SET > 0);
 
@@ -267,7 +267,7 @@ function _showSchemaReview(result) {
   }
   content.appendChild(nullSummary);
 
-  renderModal(`SIG(⊡) Schema Review`, content, [
+  renderModal('Schema Review', content, [
     { label: 'Accept Schema', onClick: () => {}, primary: true }
   ]);
 }

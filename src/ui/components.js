@@ -61,7 +61,7 @@ export function renderDataTable(rows, columns, options = {}) {
       if (rowNulls && rowNulls[col]) {
         td.className = `null-${rowNulls[col].toLowerCase()}`;
         td.textContent = `[${rowNulls[col]}]`;
-        td.title = `NUL(∅): ${rowNulls[col]}`;
+        td.title = rowNulls[col];
       } else if (value === null || value === undefined) {
         td.className = 'null-unknown';
         td.textContent = '[UNKNOWN]';
@@ -88,7 +88,7 @@ export function renderDropzone(onFile) {
   const zone = html`
     <div class="dropzone">
       <span class="drop-icon"><i class="ph ph-upload-simple" style="font-size: 2.5rem;"></i></span>
-      <p>Drop any data file to ingest into the Given-Log</p>
+      <p>Drop a CSV or JSON file to import</p>
       <p style="font-size: 0.8rem; margin-top: 8px; color: var(--text-muted);">or click to browse</p>
     </div>
   `;
@@ -192,8 +192,8 @@ export function renderOperatorSelector(onSelect, selected = null) {
   for (const [code, op] of Object.entries(OPERATORS)) {
     const btn = document.createElement('button');
     btn.className = `btn btn-sm ${selected === code ? 'btn-primary' : ''}`;
-    btn.innerHTML = `<span class="op-glyph ${op.triad.toLowerCase()}" style="width:24px;height:24px;font-size:1rem;">${op.glyph}</span> ${code}`;
-    btn.title = `${op.verb} — ${op.description}`;
+    btn.innerHTML = `<span class="op-glyph ${op.triad.toLowerCase()}" style="width:24px;height:24px;font-size:1rem;">${op.glyph}</span> ${op.friendlyName}`;
+    btn.title = `${op.glyph} ${code} (${op.verb}) — ${op.description}`;
 
     btn.addEventListener('click', () => {
       container.querySelectorAll('.btn').forEach(b => b.classList.remove('btn-primary'));
@@ -232,8 +232,9 @@ export function renderHelixBar(activeOperator = null) {
 
     const step = document.createElement('span');
     step.className = `helix-step ${activeOperator === code ? 'active' : ''}`;
-    step.innerHTML = `${op.glyph} ${code}`;
-    step.title = `${op.verb} — ${op.description}`;
+    step.dataset.operator = code;
+    step.innerHTML = `${op.friendlyName}`;
+    step.title = `${op.glyph} ${code} (${op.verb}) — ${op.description}`;
     bar.appendChild(step);
   }
 

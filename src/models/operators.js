@@ -13,6 +13,7 @@ export const OPERATORS = Object.freeze({
     code: 'NUL',
     glyph: '∅',
     greek: 'ν',
+    friendlyName: 'Validate Nulls',
     verb: 'to nullify',
     role: 'Ground',
     triad: 'Existence',
@@ -30,6 +31,7 @@ export const OPERATORS = Object.freeze({
     code: 'SIG',
     glyph: '⊡',
     greek: 'σ',
+    friendlyName: 'Check Types',
     verb: 'to point',
     role: 'Figure',
     triad: 'Existence',
@@ -42,6 +44,7 @@ export const OPERATORS = Object.freeze({
     code: 'INS',
     glyph: '△',
     greek: 'α',
+    friendlyName: 'Import',
     verb: 'to create',
     role: 'Pattern',
     triad: 'Existence',
@@ -54,6 +57,7 @@ export const OPERATORS = Object.freeze({
     code: 'SEG',
     glyph: '|',
     greek: 'κ',
+    friendlyName: 'Filter',
     verb: 'to cut',
     role: 'Ground',
     triad: 'Structure',
@@ -66,6 +70,7 @@ export const OPERATORS = Object.freeze({
     code: 'CON',
     glyph: '⋈',
     greek: 'ε',
+    friendlyName: 'Join',
     verb: 'to join',
     role: 'Figure',
     triad: 'Structure',
@@ -78,6 +83,7 @@ export const OPERATORS = Object.freeze({
     code: 'SYN',
     glyph: '∨',
     greek: 'η',
+    friendlyName: 'Merge',
     verb: 'to merge',
     role: 'Pattern',
     triad: 'Structure',
@@ -90,6 +96,7 @@ export const OPERATORS = Object.freeze({
     code: 'ALT',
     glyph: '∿',
     greek: 'δ',
+    friendlyName: 'Compare',
     verb: 'to change',
     role: 'Ground',
     triad: 'Significance',
@@ -102,6 +109,7 @@ export const OPERATORS = Object.freeze({
     code: 'SUP',
     glyph: '∥',
     greek: 'ψ',
+    friendlyName: 'Branch',
     verb: 'to hold',
     role: 'Figure',
     triad: 'Significance',
@@ -114,6 +122,7 @@ export const OPERATORS = Object.freeze({
     code: 'REC',
     glyph: '↬',
     greek: 'Ω',
+    friendlyName: 'Reconcile',
     verb: 'to reframe',
     role: 'Pattern',
     triad: 'Significance',
@@ -223,3 +232,19 @@ export function formatOperator(operatorCode) {
   if (!op) return operatorCode;
   return `${op.code}(${op.glyph})`;
 }
+
+/**
+ * Format an operator with its friendly name: "Filter (SEG)"
+ */
+export function formatOperatorFriendly(operatorCode) {
+  const op = OPERATORS[operatorCode];
+  if (!op) return operatorCode;
+  return `${op.friendlyName} (${op.code})`;
+}
+
+/** Triad display labels — maps internal triad names to user-friendly labels */
+export const TRIAD_LABELS = Object.freeze({
+  Existence: 'Data Quality',
+  Structure: 'Data Structure',
+  Significance: 'Interpretation'
+});

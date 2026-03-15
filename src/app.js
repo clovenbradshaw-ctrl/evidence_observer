@@ -17,13 +17,13 @@ import { OPERATORS, HELIX_ORDER } from './models/operators.js';
 let currentView = 'vault';
 
 const VIEWS = {
-  vault:    { label: 'Given-Log',    icon: 'ph ph-vault',          render: renderVaultView },
-  session:  { label: 'Meant-Graph',  icon: 'ph ph-graph',          render: renderSessionView },
-  horizon:  { label: 'Horizon',      icon: 'ph ph-binoculars',     render: renderHorizonView },
-  ai:       { label: 'AI Analysis',  icon: 'ph ph-sparkle',        render: renderAIView },
-  dag:      { label: 'DAG',          icon: 'ph ph-flow-arrow',     render: renderDAGView },
-  audit:    { label: 'Provenance',   icon: 'ph ph-fingerprint',    render: renderAuditView },
-  export:   { label: 'Export',       icon: 'ph ph-export',         render: renderExportView }
+  vault:    { label: 'Sources',       icon: 'ph ph-vault',          render: renderVaultView },
+  session:  { label: 'Workbook',      icon: 'ph ph-graph',          render: renderSessionView },
+  horizon:  { label: 'Perspectives',  icon: 'ph ph-binoculars',     render: renderHorizonView },
+  ai:       { label: 'AI Analysis',   icon: 'ph ph-sparkle',        render: renderAIView },
+  dag:      { label: 'Lineage',       icon: 'ph ph-flow-arrow',     render: renderDAGView },
+  audit:    { label: 'Audit Trail',   icon: 'ph ph-fingerprint',    render: renderAuditView },
+  export:   { label: 'Export',         icon: 'ph ph-export',         render: renderExportView }
 };
 
 /**
@@ -36,7 +36,7 @@ export async function initApp() {
   app.innerHTML = `
     <div class="loading" style="min-height: 100vh;">
       <div class="spinner"></div>
-      <div>Initializing Evidence Observer</div>
+      <div>Loading Evidence Observer</div>
     </div>
   `;
 
@@ -103,8 +103,8 @@ function renderApp() {
     }
     const step = document.createElement('span');
     step.className = 'helix-step';
-    step.innerHTML = `${op.glyph} ${code}`;
-    step.title = `${op.verb} — ${op.description}`;
+    step.innerHTML = `${op.friendlyName}`;
+    step.title = `${op.glyph} ${code} (${op.verb}) — ${op.description}`;
     helixBar.appendChild(step);
   }
   helixContainer.appendChild(helixBar);

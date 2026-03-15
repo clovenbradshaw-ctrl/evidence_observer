@@ -7,7 +7,7 @@
  *   3. Settings — API key configuration
  */
 
-import { OPERATORS, formatOperator } from '../models/operators.js';
+import { OPERATORS, formatOperator, TRIAD_LABELS } from '../models/operators.js';
 import { getAllSources } from '../models/given_log.js';
 import { DEFAULT_MODULES, getModulesByTriad } from '../ai/modules.js';
 import { getCustomModules, importModules, deleteCustomModule, exportModules, generateModuleFromDescription } from '../ai/module_builder.js';
@@ -28,7 +28,7 @@ export function renderAIView(container) {
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h2 style="font-size: 1.2rem;">
         <span style="color: var(--accent);">⊡</span>
-        AI Analysis — LLM-Powered EO Operators
+        AI Analysis
       </h2>
       <div style="font-size: 0.8rem; color: var(--text-muted);">
         ${isAIConfigured() ? `<span style="color: var(--completed-border);">● Connected</span> (${getProvider()})` : '<span style="color: var(--failed-border);">● Not configured</span>'}
@@ -78,7 +78,7 @@ function _renderAnalyzeTab(container) {
     container.appendChild(html`
       <div class="empty-state">
         <div class="glyph">△</div>
-        <p>No data in the Given-Log yet.<br>Upload data in the Given-Log view first.</p>
+        <p>No data sources yet.<br>Import data in the Sources view first.</p>
       </div>
     `);
     return;
@@ -87,7 +87,7 @@ function _renderAnalyzeTab(container) {
   // Source selector
   const sourceGroup = html`
     <div class="form-group">
-      <label class="form-label">Data Source (Given-Log)</label>
+      <label class="form-label">Data Source</label>
     </div>
   `;
   const sourceSelect = document.createElement('select');
@@ -96,7 +96,7 @@ function _renderAnalyzeTab(container) {
   for (const source of sources) {
     const opt = document.createElement('option');
     opt.value = source.id;
-    opt.textContent = `${OPERATORS.INS.glyph} ${source.filename} (${source.row_count} rows)`;
+    opt.textContent = `${source.filename} (${source.row_count} rows)`;
     sourceSelect.appendChild(opt);
   }
   sourceGroup.appendChild(sourceSelect);
@@ -117,12 +117,12 @@ function _renderAnalyzeTab(container) {
 
   for (const [triad, modules] of Object.entries(byTriad)) {
     const optgroup = document.createElement('optgroup');
-    optgroup.label = `${triad} Triad`;
+    optgroup.label = TRIAD_LABELS[triad] || triad;
     for (const mod of modules) {
       const op = OPERATORS[mod.operatorType];
       const opt = document.createElement('option');
       opt.value = mod.id;
-      opt.textContent = `${op.glyph} ${mod.name} (${mod.operatorType})`;
+      opt.textContent = `${op.glyph} ${mod.name} (${op.friendlyName})`;
       optgroup.appendChild(opt);
     }
     moduleSelect.appendChild(optgroup);
@@ -135,7 +135,7 @@ function _renderAnalyzeTab(container) {
       const op = OPERATORS[mod.operatorType];
       const opt = document.createElement('option');
       opt.value = mod.id;
-      opt.textContent = `${op?.glyph || '?'} ${mod.name} (${mod.operatorType}) [custom]`;
+      opt.textContent = `${op?.glyph || '?'} ${mod.name} (${op?.friendlyName || mod.operatorType}) [custom]`;
       customGroup.appendChild(opt);
     }
     moduleSelect.appendChild(customGroup);
@@ -422,7 +422,7 @@ function _renderModulesTab(container, viewContainer) {
     const triadColors = { Existence: 'given-border', Structure: 'completed-border', Significance: 'meant-border' };
     container.appendChild(html`
       <h3 style="font-size: 0.95rem; color: var(--${triadColors[triad]}); margin: 20px 0 8px;">
-        ${triad} Triad
+        ${TRIAD_LABELS[triad] || triad}
       </h3>
     `);
 

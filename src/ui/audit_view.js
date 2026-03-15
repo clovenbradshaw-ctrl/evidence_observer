@@ -5,7 +5,7 @@
  */
 
 import { getAllSessions, getSessionSteps, getStepOutputs } from '../models/meant_graph.js';
-import { OPERATORS, formatOperator } from '../models/operators.js';
+import { OPERATORS, formatOperator, formatOperatorFriendly } from '../models/operators.js';
 import { renderTechnicalView, renderPublicView } from '../provenance/views.js';
 import { traceProvenance, drillDown, checkMeantConformance } from '../provenance/service.js';
 import { renderDataTable, renderModal, html, toast } from './components.js';
@@ -20,7 +20,7 @@ export function renderAuditView(container) {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
           <i class="ph ph-fingerprint" style="color: var(--accent); font-size: 1.3rem;"></i>
-          Provenance
+          Audit Trail
         </h2>
       </div>
     </div>
@@ -87,7 +87,7 @@ function _renderAuditContent(container, sessionId) {
     const warning = html`
       <div class="card" style="border-color: var(--failed-border); margin-bottom: 16px;">
         <div style="color: var(--failed-border); font-weight: 600; margin-bottom: 8px;">
-          ⚠ Meant-Conformance Violations
+          ⚠ Validation Issues
         </div>
         ${conformance.violations.map(v =>
           `<div style="font-size: 0.85rem; margin-left: 12px;">
@@ -121,7 +121,7 @@ function _renderTechnicalStep(step) {
     <div class="card" style="margin-bottom: 12px;">
       <div class="card-header">
         <span class="op-glyph ${op.triad.toLowerCase()}">${op.glyph}</span>
-        <div class="card-title">Step ${step.sequence_number}: ${formatOperator(step.operator_type)}</div>
+        <div class="card-title">Step ${step.sequence_number}: ${formatOperatorFriendly(step.operator_type)}</div>
         <span class="status-${step.status}">${step.status}</span>
       </div>
     </div>
@@ -147,7 +147,7 @@ function _renderTechnicalStep(step) {
         const outputSection = html`
           <div style="margin-top: 12px;">
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
-              Output (click any row for π drill-down)
+              Output (click any row to trace lineage)
             </div>
           </div>
         `;
@@ -218,7 +218,7 @@ function _showDrillDown(stepId, rowIndex) {
   if (result.provenanceChain.length > 0) {
     const chainEl = html`
       <div style="margin-bottom: 16px;">
-        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">π Provenance Chain</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Trace Path</div>
       </div>
     `;
     for (const link of result.provenanceChain) {
@@ -234,13 +234,13 @@ function _showDrillDown(stepId, rowIndex) {
   // Given-Log sources
   if (result.givenSources.length > 0) {
     content.appendChild(html`
-      <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Given-Log Sources (immutable)</div>
+      <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Original Sources (immutable)</div>
     `);
     for (const source of result.givenSources) {
       const sourceEl = html`
         <div class="card given-row" style="margin-bottom: 8px;">
           <div style="font-size: 0.85rem; margin-bottom: 4px;">
-            <span class="given-badge">Given</span> ${source.source}
+            <span class="given-badge">Source</span> ${source.source}
           </div>
         </div>
       `;
@@ -256,9 +256,9 @@ function _showDrillDown(stepId, rowIndex) {
   // Groundedness check
   content.appendChild(html`
     <div style="margin-top: 12px; font-size: 0.85rem; color: ${result.isGrounded ? 'var(--completed-border)' : 'var(--failed-border)'};">
-      ${result.isGrounded ? '✓ Grounded: traces to Given-Log (Rule 7)' : '✗ UngroundedAssertion: no path to Given-Log'}
+      ${result.isGrounded ? '✓ Verified: traces back to original source data' : '✗ Warning: no path to original source data'}
     </div>
   `);
 
-  renderModal('π Provenance Drill-Down', content, [{ label: 'Close' }]);
+  renderModal('Lineage Trace', content, [{ label: 'Close' }]);
 }
