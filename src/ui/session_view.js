@@ -20,11 +20,11 @@ export function renderSessionView(container) {
   const view = html`
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="font-size: 1.2rem;">
-          <span style="color: var(--meant-border);">${OPERATORS.ALT.glyph}</span>
-          Meant-Graph — Significance Domain
+        <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+          <i class="ph ph-graph" style="color: var(--meant-border); font-size: 1.3rem;"></i>
+          Meant-Graph
         </h2>
-        <button class="btn btn-primary" id="btn-new-session">+ New Session</button>
+        <button class="btn btn-primary" id="btn-new-session"><i class="ph ph-plus"></i> New Session</button>
       </div>
     </div>
   `;
@@ -55,7 +55,7 @@ function _renderSessionList(container) {
   if (sessions.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="glyph">∿</div>
+        <div class="empty-icon"><i class="ph ph-graph" style="font-size: 3rem;"></i></div>
         <p>No analysis sessions yet.<br>Create a session to begin building the Meant-Graph.</p>
       </div>
     `;
@@ -66,7 +66,7 @@ function _renderSessionList(container) {
     const card = html`
       <div class="card" style="cursor: pointer;">
         <div class="card-header">
-          <span class="op-glyph significance">${OPERATORS.ALT.glyph}</span>
+          <span class="op-glyph significance"><i class="ph ph-graph" style="font-size: 1rem;"></i></span>
           <div style="flex: 1;">
             <div class="card-title">${session.name}</div>
             <div style="font-size: 0.8rem; color: var(--text-muted);">
@@ -93,7 +93,7 @@ function _renderActiveSession(container, sessionId) {
   const session = chain.length > 0 ? { id: sessionId } : null;
 
   // Back button
-  const backBtn = html`<button class="btn btn-sm" style="margin-bottom: 16px;">← Back to sessions</button>`;
+  const backBtn = html`<button class="btn btn-sm" style="margin-bottom: 16px;"><i class="ph ph-arrow-left"></i> Back to sessions</button>`;
   backBtn.addEventListener('click', () => {
     _currentSessionId = null;
     _renderSessionList(container);
@@ -125,7 +125,7 @@ function _renderActiveSession(container, sessionId) {
   }
 
   // Add step button
-  const addBtn = html`<button class="btn btn-primary" style="margin-top: 12px;">+ Add Step</button>`;
+  const addBtn = html`<button class="btn btn-primary" style="margin-top: 12px;"><i class="ph ph-plus"></i> Add Step</button>`;
   addBtn.addEventListener('click', () => {
     _showAddStepModal(sessionId, container);
   });

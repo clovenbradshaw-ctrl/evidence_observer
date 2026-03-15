@@ -67,6 +67,16 @@ export function sig_parseJSON(text) {
   }
   const headers = Array.from(headerSet);
 
+  // Flatten nested values — objects/arrays become JSON strings
+  for (const row of rows) {
+    for (const key of headers) {
+      const v = row[key];
+      if (v !== null && v !== undefined && typeof v === 'object') {
+        row[key] = JSON.stringify(v);
+      }
+    }
+  }
+
   return { headers, rows };
 }
 
