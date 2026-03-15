@@ -42,7 +42,10 @@ export function createStep({
   description,
   inputIds = [],
   lensDependencyIds = [],
-  code = null
+  code = null,
+  executionMode = 'code',
+  aiConfig = null,
+  dataSelector = null
 }) {
   if (!OPERATORS[operatorType]) {
     throw new Error(`Invalid operator type: ${operatorType}. Must be one of: ${Object.keys(OPERATORS).join(', ')}`);
@@ -52,11 +55,16 @@ export function createStep({
   run(
     `INSERT INTO steps
       (id, session_id, sequence_number, operator_type, description,
-       input_ids_json, lens_dependency_ids_json, code, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       input_ids_json, lens_dependency_ids_json, code,
+       execution_mode, ai_config_json, data_selector_json,
+       status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [id, sessionId, sequenceNumber, operatorType, description,
      JSON.stringify(inputIds), JSON.stringify(lensDependencyIds),
-     code, StepStatus.PENDING, now()]
+     code, executionMode,
+     aiConfig ? JSON.stringify(aiConfig) : null,
+     dataSelector ? JSON.stringify(dataSelector) : null,
+     StepStatus.PENDING, now()]
   );
   return id;
 }
