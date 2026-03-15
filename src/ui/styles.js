@@ -1389,6 +1389,434 @@ kbd {
 
 .inline-step-form .form-group { margin-bottom: 12px; }
 .inline-step-form .form-group:last-child { margin-bottom: 0; }
+
+/* ============ EOQL View ============ */
+
+.eoql-layout {
+  display: flex;
+  gap: 20px;
+  min-height: 0;
+}
+
+.eoql-main {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.eoql-stacks-panel {
+  flex: 2;
+  max-width: 380px;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  overflow-y: auto;
+  max-height: calc(100vh - 100px);
+}
+
+/* Command bar */
+.eoql-cmd-wrapper {
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.eoql-cmd-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.eoql-cmd-row {
+  display: flex;
+  gap: 8px;
+}
+
+.eoql-cmd-input {
+  flex: 1;
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+
+.eoql-cmd-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.eoql-cmd-input::placeholder {
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+}
+
+.eoql-run-btn {
+  flex-shrink: 0;
+  padding: 10px 20px;
+}
+
+/* Source chips */
+.eoql-source-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+.eoql-chip-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.eoql-source-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  background: var(--given-bg);
+  color: var(--given-text);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.eoql-source-chip:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+}
+
+/* Autocomplete dropdown */
+.eoql-ac-drop {
+  display: none;
+  position: relative;
+  z-index: 100;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+.eoql-ac-drop.open { display: block; }
+
+.eoql-ac-grp {
+  padding: 6px 12px 3px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.eoql-ac-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background 0.08s;
+}
+.eoql-ac-item:hover, .eoql-ac-item.sel {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.eoql-ac-ico {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 0.5px solid var(--border);
+}
+.eoql-ac-ico.ac-ico-op { background: var(--existence-bg); color: var(--existence-text); border-color: var(--existence-border); }
+.eoql-ac-ico.ac-ico-source { background: var(--given-bg); color: var(--given-text); border-color: rgba(59,130,246,0.15); }
+.eoql-ac-ico.ac-ico-field { background: var(--structure-bg); color: var(--structure-text); border-color: var(--structure-border); }
+.eoql-ac-ico.ac-ico-val { background: var(--significance-bg); color: var(--significance-text); border-color: var(--significance-border); }
+.eoql-ac-ico.ac-ico-expr { background: var(--sup-bg); color: #6b21a8; border-color: rgba(168,85,247,0.15); }
+.eoql-ac-ico.ac-ico-mod { background: var(--meant-bg); color: var(--meant-text); border-color: rgba(245,158,11,0.15); }
+
+.eoql-ac-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.eoql-ac-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.eoql-ac-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eoql-ac-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+}
+
+/* History */
+.eoql-hist-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+.eoql-hist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.eoql-hist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: background 0.1s;
+}
+.eoql-hist-item:hover { background: var(--bg-elevated); }
+
+.eoql-hist-op { font-size: 0.68rem; }
+
+.eoql-hist-cmd {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eoql-hist-summary {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Results */
+.eoql-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eoql-result-card {
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.eoql-result-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 0.5px solid var(--border);
+  background: var(--bg);
+}
+
+.eoql-result-summary {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eoql-result-count {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+/* Operator Stacks Panel */
+.eoql-stacks-header {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 14px 14px 8px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.eoql-stacks-search {
+  width: calc(100% - 24px);
+  margin: 10px 12px 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--text-primary);
+}
+.eoql-stacks-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.eoql-stack-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.eoql-stack-tab {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--text-muted);
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+.eoql-stack-tab:hover { color: var(--text-primary); background: var(--bg-elevated); }
+.eoql-stack-tab.active {
+  color: var(--accent);
+  background: rgba(37, 99, 235, 0.08);
+  font-weight: 600;
+}
+
+.eoql-stack-list {
+  padding: 8px;
+}
+
+.eoql-stack-cat-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.eoql-stack-cat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+.eoql-stack-cat-icon.existence { background: var(--existence-bg); color: var(--existence-text); }
+.eoql-stack-cat-icon.structure { background: var(--structure-bg); color: var(--structure-text); }
+.eoql-stack-cat-icon.significance { background: var(--significance-bg); color: var(--significance-text); }
+
+.eoql-stack-card {
+  padding: 10px 12px;
+  border: 0.5px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+  margin-bottom: 2px;
+}
+.eoql-stack-card:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.eoql-stack-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.eoql-stack-name {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.eoql-stack-ops {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.eoql-stack-op {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.eoql-stack-op.existence { background: var(--existence-bg); color: var(--existence-text); }
+.eoql-stack-op.structure { background: var(--structure-bg); color: var(--structure-text); }
+.eoql-stack-op.significance { background: var(--significance-bg); color: var(--significance-text); }
+.eoql-stack-op.sup { background: var(--sup-bg); color: #6b21a8; }
+
+.eoql-stack-arrow {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+.eoql-stack-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
 `;
 
 /**
