@@ -19,10 +19,13 @@ export function html(strings, ...values) {
  *
  * @param {Object[]} rows - Data rows
  * @param {string[]} columns - Column names to display
- * @param {Object} [options] - { onRowClick, nullStates, sortable }
+ * @param {Object} [options] - { onRowClick, nullStates, sortable, maxRows }
  */
 export function renderDataTable(rows, columns, options = {}) {
-  const { onRowClick, nullStates, sortable = true } = options;
+  const { onRowClick, nullStates, sortable = true, maxRows } = options;
+  const displayRows = maxRows ? rows.slice(0, maxRows) : rows;
+
+  const wrapper = document.createElement('div');
 
   const table = document.createElement('table');
   table.className = 'data-table';
@@ -43,8 +46,8 @@ export function renderDataTable(rows, columns, options = {}) {
 
   // Body
   const tbody = document.createElement('tbody');
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+  for (let i = 0; i < displayRows.length; i++) {
+    const row = displayRows[i];
     const tr = document.createElement('tr');
 
     if (onRowClick) {
@@ -74,24 +77,97 @@ export function renderDataTable(rows, columns, options = {}) {
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
+  wrapper.appendChild(table);
 
-  return table;
+  // "Show all" link if truncated
+  if (maxRows && rows.length > maxRows) {
+    const showAll = document.createElement('div');
+    showAll.style.cssText = 'font-size: 0.78rem; color: var(--accent); padding: 6px 12px; cursor: pointer;';
+    showAll.textContent = `show all ${rows.length} rows`;
+    showAll.addEventListener('click', () => {
+      wrapper.innerHTML = '';
+      wrapper.appendChild(renderDataTable(rows, columns, { ...options, maxRows: undefined }).querySelector('table') || renderDataTable(rows, columns, { ...options, maxRows: undefined }));
+    });
+    wrapper.appendChild(showAll);
+  }
+
+  return wrapper;
+}
+
+/**
+ * Render a mini data table for notebook cell output.
+ */
+export function renderMiniTable(rows, columns, maxRows = 5) {
+  const wrapper = document.createElement('div');
+
+  const table = document.createElement('table');
+  table.className = 'mini-table';
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  for (const col of columns) {
+    const th = document.createElement('th');
+    th.textContent = col;
+    headerRow.appendChild(th);
+  }
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const displayRows = rows.slice(0, maxRows);
+  const tbody = document.createElement('tbody');
+  for (const row of displayRows) {
+    const tr = document.createElement('tr');
+    for (const col of columns) {
+      const td = document.createElement('td');
+      const value = row[col];
+      if (value === null || value === undefined) {
+        td.style.color = 'var(--text-muted)';
+        td.textContent = '—';
+      } else {
+        td.textContent = String(value);
+      }
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrapper.appendChild(table);
+
+  if (rows.length > maxRows) {
+    const more = document.createElement('div');
+    more.style.cssText = 'font-size: 0.78rem; color: var(--accent); padding: 6px 14px; cursor: pointer;';
+    more.textContent = `show all ${rows.length} rows`;
+    more.addEventListener('click', () => {
+      wrapper.innerHTML = '';
+      wrapper.appendChild(renderMiniTable(rows, columns, rows.length));
+    });
+    wrapper.appendChild(more);
+  }
+
+  return wrapper;
 }
 
 /**
  * Render a file upload dropzone.
  *
  * @param {Function} onFile - Callback receiving the File object
+ * @param {boolean} [compact=false] - If true, render slim banner style
  * @returns {HTMLElement}
  */
-export function renderDropzone(onFile) {
-  const zone = html`
-    <div class="dropzone">
+export function renderDropzone(onFile, compact = false) {
+  const zone = document.createElement('div');
+
+  if (compact) {
+    zone.className = 'source-dropzone';
+    zone.textContent = '+ Import source';
+  } else {
+    zone.className = 'dropzone';
+    zone.innerHTML = `
       <span class="drop-icon"><i class="ph ph-upload-simple" style="font-size: 2.5rem;"></i></span>
       <p>Drop a CSV or JSON file to import</p>
       <p style="font-size: 0.8rem; margin-top: 8px; color: var(--text-muted);">or click to browse</p>
-    </div>
-  `;
+    `;
+  }
 
   const input = document.createElement('input');
   input.type = 'file';
@@ -179,7 +255,33 @@ export function renderModal(title, content, actions = []) {
 }
 
 /**
- * Render an operator type selector with EO glyphs.
+ * Render an operator picker as a 3×3 grid.
+ *
+ * @param {Function} onSelect - Callback with operator code
+ * @returns {HTMLElement}
+ */
+export function renderOperatorPicker(onSelect) {
+  const picker = document.createElement('div');
+  picker.className = 'op-picker open';
+
+  for (const [code, op] of Object.entries(OPERATORS)) {
+    const chip = document.createElement('div');
+    chip.className = 'op-chip';
+    chip.innerHTML = `
+      <span class="chip-glyph">${op.glyph}</span>
+      ${op.friendlyName}
+      <span class="chip-code">${code}</span>
+    `;
+    chip.title = `${op.glyph} ${code} (${op.verb}) — ${op.description}`;
+    chip.addEventListener('click', () => onSelect(code));
+    picker.appendChild(chip);
+  }
+
+  return picker;
+}
+
+/**
+ * Render an operator type selector with EO glyphs (legacy, still used by some views).
  *
  * @param {Function} onSelect - Callback with operator code
  * @param {string} [selected] - Currently selected operator code
@@ -208,6 +310,30 @@ export function renderOperatorSelector(onSelect, selected = null) {
 }
 
 /**
+ * Get the CSS class for an operator's triad.
+ */
+export function getTriadClass(operatorType) {
+  const op = OPERATORS[operatorType];
+  if (!op) return '';
+  if (operatorType === 'SUP') return 'sup';
+  return op.triad.toLowerCase();
+}
+
+/**
+ * Create an operator badge element.
+ */
+export function createOpBadge(operatorType) {
+  const op = OPERATORS[operatorType];
+  if (!op) return html`<span class="op-badge">${operatorType}</span>`;
+
+  const triadClass = getTriadClass(operatorType);
+  const badge = document.createElement('span');
+  badge.className = `op-badge ${triadClass}`;
+  badge.innerHTML = `<span class="glyph">${op.glyph}</span> ${operatorType}`;
+  return badge;
+}
+
+/**
  * Render the helix ordering bar showing progress.
  *
  * @param {string} [activeOperator] - Currently active operator code
@@ -226,7 +352,7 @@ export function renderHelixBar(activeOperator = null) {
     if (i > 0) {
       const arrow = document.createElement('span');
       arrow.className = 'helix-arrow';
-      arrow.textContent = '→';
+      arrow.textContent = '\u2192';
       bar.appendChild(arrow);
     }
 
