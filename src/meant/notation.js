@@ -35,9 +35,17 @@ export function generateNotation(step, inputs, executionResult = null, horizon =
     config: {},
     output: null,
     execution: {},
+    executionMode: step.execution_mode || 'code',
     conformance: [],
     horizon: null
   };
+
+  // AI provenance metadata
+  if (step.execution_mode === 'ai' && executionResult) {
+    parts.aiModel = executionResult.model || null;
+    parts.aiTokensIn = executionResult.usage?.input_tokens || null;
+    parts.aiTokensOut = executionResult.usage?.output_tokens || null;
+  }
 
   // Operator-specific notation
   switch (step.operator_type) {
@@ -214,6 +222,11 @@ function _formatNotationText(parts) {
     text += ` → ${parts.output}`;
   }
 
+  // AI provenance tag
+  if (parts.executionMode === 'ai') {
+    text += ` [via LLM${parts.aiModel ? ': ' + parts.aiModel : ''}]`;
+  }
+
   // Conformance annotations
   for (const check of parts.conformance) {
     text += `\n${check.rule}: ${check.detail}`;
@@ -243,6 +256,11 @@ function _formatTechnicalView(parts) {
 
   if (parts.execution.warnings?.length > 0) {
     text += `\nWarnings: ${parts.execution.warnings.join('; ')}`;
+  }
+
+  // AI token usage
+  if (parts.executionMode === 'ai' && parts.aiTokensIn != null) {
+    text += `\nLLM tokens: ${parts.aiTokensIn} in / ${parts.aiTokensOut} out`;
   }
 
   return text;
@@ -282,4 +300,12 @@ function _formatPublicView(parts, step) {
     default:
       return `Step ${stepNum} — ${step.description || 'Analysis step'}`;
   }
+}
+
+/**
+ * Format AI provenance suffix for public views.
+ */
+function _aiProvenanceSuffix(parts) {
+  if (parts.executionMode !== 'ai') return '';
+  return `\nAnalysis performed by AI${parts.aiModel ? ` (${parts.aiModel})` : ''}.`;
 }

@@ -19,6 +19,7 @@ import { getSourceData } from '../given/service.js';
 import { validateHelixOrdering, validateOperatorConsistency } from './helix.js';
 import { generateNotation } from './notation.js';
 import { executeStepCode } from './executor.js';
+import { executeAIStep } from './ai_executor.js';
 
 /**
  * Create a new analysis session.
@@ -34,7 +35,7 @@ export function startSession({ name, description, horizonId, analystId, mode }) 
  * @param {Object} params - Step parameters
  * @returns {{ stepId: string, helixValidation: Object }}
  */
-export function addStep({ sessionId, operatorType, description, inputIds = [], lensDependencyIds = [], code = null }) {
+export function addStep({ sessionId, operatorType, description, inputIds = [], lensDependencyIds = [], code = null, executionMode = 'code', aiConfig = null, dataSelector = null }) {
   const session = getSession(sessionId);
   if (!session) throw new Error(`Session ${sessionId} not found`);
 
@@ -56,7 +57,10 @@ export function addStep({ sessionId, operatorType, description, inputIds = [], l
     description,
     inputIds,
     lensDependencyIds,
-    code
+    code,
+    executionMode,
+    aiConfig,
+    dataSelector
   });
 
   return { stepId, helixValidation };
@@ -114,9 +118,17 @@ export async function executeStep(stepId, horizonState = null) {
     // Validate operator consistency
     const consistency = validateOperatorConsistency(step.operator_type, step.code);
 
-    // Execute code
+    // Execute based on mode
     let executionResult;
-    if (step.code) {
+    const executionMode = step.execution_mode || 'code';
+
+    if (executionMode === 'ai') {
+      // AI execution path
+      const aiConfig = step.ai_config_json ? JSON.parse(step.ai_config_json) : {};
+      const dataSelector = step.data_selector_json ? JSON.parse(step.data_selector_json) : null;
+      executionResult = await executeAIStep(aiConfig, inputData, dataSelector);
+    } else if (step.code) {
+      // Existing code execution path
       executionResult = await executeStepCode(step.code, {
         inputs: inputData,
         horizon: horizonState || {}
@@ -174,7 +186,8 @@ export async function executeStep(stepId, horizonState = null) {
     // Update step
     updateStepStatus(stepId, StepStatus.COMPLETED);
     updateStepNotation(stepId, notation.structured);
-    updateStepExecutionLog(stepId, {
+
+    const executionLog = {
       timestamp: new Date().toISOString(),
       runtime_ms: executionResult.runtime_ms,
       rowsIn: executionResult.rowsIn,
@@ -182,7 +195,15 @@ export async function executeStep(stepId, horizonState = null) {
       stdout: executionResult.stdout,
       stderr: executionResult.stderr,
       warnings: executionResult.warnings
-    });
+    };
+
+    // Include AI-specific metadata
+    if (executionMode === 'ai') {
+      executionLog.aiModel = executionResult.model || null;
+      executionLog.aiUsage = executionResult.usage || null;
+    }
+
+    updateStepExecutionLog(stepId, executionLog);
 
     // Persist to IndexedDB
     await persistToIndexedDB();

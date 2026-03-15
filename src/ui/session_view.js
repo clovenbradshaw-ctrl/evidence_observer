@@ -10,6 +10,8 @@ import { OPERATORS, formatOperator, formatOperatorFriendly } from '../models/ope
 import { startSession, addStep, executeStep, getSessionChain } from '../meant/service.js';
 import { renderOperatorPicker, renderMiniTable, renderHelixBar, renderDataTable, renderModal, createOpBadge, getTriadClass, html, toast } from './components.js';
 import { updateTopBar } from '../app.js';
+import { getModulesForOperator } from '../ai/modules.js';
+import { getCustomModules } from '../ai/module_builder.js';
 
 let _currentSessionId = null;
 
@@ -172,6 +174,16 @@ function _renderNotebookCell(step, index, sessionId, viewContainer) {
   }
 
   header.appendChild(badge);
+
+  // AI mode indicator
+  if (step.execution_mode === 'ai') {
+    const aiBadge = document.createElement('span');
+    aiBadge.className = 'meant-badge';
+    aiBadge.style.cssText = 'font-size: 0.68rem; padding: 2px 6px; background: var(--primary); color: white; border-radius: 4px; margin-right: 6px;';
+    aiBadge.textContent = 'AI';
+    header.appendChild(aiBadge);
+  }
+
   header.appendChild(desc);
   header.appendChild(meta);
 
@@ -187,8 +199,64 @@ function _renderNotebookCell(step, index, sessionId, viewContainer) {
 
   cell.appendChild(header);
 
-  // ── Code body (collapsible) ──
-  if (step.code) {
+  // ── Code / AI body (collapsible) ──
+  if (step.execution_mode === 'ai') {
+    const aiBody = document.createElement('div');
+    aiBody.className = 'cell-code';
+    aiBody.style.whiteSpace = 'pre-wrap';
+
+    const aiConfig = step.ai_config_json ? JSON.parse(step.ai_config_json) : {};
+    const dataSelector = step.data_selector_json ? JSON.parse(step.data_selector_json) : null;
+
+    let summaryLines = [];
+    if (aiConfig.moduleId) summaryLines.push(`Module: ${aiConfig.moduleId}`);
+    if (aiConfig.systemPrompt) {
+      const truncated = aiConfig.systemPrompt.length > 120
+        ? aiConfig.systemPrompt.slice(0, 120) + '...'
+        : aiConfig.systemPrompt;
+      summaryLines.push(`System: ${truncated}`);
+    }
+    if (aiConfig.userPromptTemplate) {
+      const truncated = aiConfig.userPromptTemplate.length > 120
+        ? aiConfig.userPromptTemplate.slice(0, 120) + '...'
+        : aiConfig.userPromptTemplate;
+      summaryLines.push(`Prompt: ${truncated}`);
+    }
+    if (dataSelector) {
+      const parts = [];
+      if (dataSelector.fields) parts.push(`${dataSelector.fields.length} fields`);
+      if (dataSelector.filter) parts.push(`filter: ${dataSelector.filter}`);
+      if (dataSelector.sampleSize) parts.push(`max ${dataSelector.sampleSize} rows`);
+      if (dataSelector.groupBy) parts.push(`grouped by ${dataSelector.groupBy}`);
+      if (parts.length > 0) summaryLines.push(`Data: ${parts.join(', ')}`);
+    }
+    if (aiConfig.outputFormat) summaryLines.push(`Output: ${aiConfig.outputFormat}`);
+
+    aiBody.textContent = summaryLines.join('\n');
+    aiBody.hidden = (step.status === 'completed' || step.status === 'stale');
+    cell.appendChild(aiBody);
+
+    // Show raw LLM response if available
+    if (step.executionLog?.stdout) {
+      const llmResponse = document.createElement('div');
+      llmResponse.className = 'cell-code';
+      llmResponse.style.cssText = 'white-space: pre-wrap; font-size: 0.75rem; max-height: 200px; overflow-y: auto; border-top: 1px solid var(--border);';
+      llmResponse.textContent = step.executionLog.stdout;
+      llmResponse.hidden = true;
+
+      const toggleLink = document.createElement('div');
+      toggleLink.style.cssText = 'padding: 2px 14px; font-size: 0.72rem; color: var(--primary); cursor: pointer;';
+      toggleLink.textContent = 'Show LLM response';
+      toggleLink.addEventListener('click', (e) => {
+        e.stopPropagation();
+        llmResponse.hidden = !llmResponse.hidden;
+        toggleLink.textContent = llmResponse.hidden ? 'Show LLM response' : 'Hide LLM response';
+      });
+
+      cell.appendChild(toggleLink);
+      cell.appendChild(llmResponse);
+    }
+  } else if (step.code) {
     const codeBody = document.createElement('div');
     codeBody.className = 'cell-code';
     codeBody.textContent = step.code;
@@ -358,19 +426,217 @@ function _showInlineStepForm(wrapper, operatorCode, insertIndex, sessionId, view
   inputGroup.appendChild(inputSelect);
   form.appendChild(inputGroup);
 
-  // Code
+  // ── Execution Mode Toggle ──
+  let currentMode = 'code';
+
+  const modeGroup = document.createElement('div');
+  modeGroup.className = 'form-group';
+  const modeLabel = document.createElement('label');
+  modeLabel.className = 'form-label';
+  modeLabel.textContent = 'Execution Mode';
+  const modeToggle = document.createElement('div');
+  modeToggle.style.cssText = 'display: flex; gap: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; width: fit-content;';
+
+  const codeBtn = document.createElement('button');
+  codeBtn.type = 'button';
+  codeBtn.textContent = 'Code';
+  codeBtn.style.cssText = 'padding: 6px 16px; border: none; cursor: pointer; font-size: 0.82rem; background: var(--primary); color: white;';
+
+  const aiBtn = document.createElement('button');
+  aiBtn.type = 'button';
+  aiBtn.textContent = 'AI';
+  aiBtn.style.cssText = 'padding: 6px 16px; border: none; cursor: pointer; font-size: 0.82rem; background: var(--bg-secondary); color: var(--text-secondary);';
+
+  modeToggle.appendChild(codeBtn);
+  modeToggle.appendChild(aiBtn);
+  modeGroup.appendChild(modeLabel);
+  modeGroup.appendChild(modeToggle);
+  form.appendChild(modeGroup);
+
+  // ── Code Panel ──
+  const codePanel = document.createElement('div');
+
   const codeGroup = document.createElement('div');
   codeGroup.className = 'form-group';
-  const codeLabel = document.createElement('label');
-  codeLabel.className = 'form-label';
-  codeLabel.textContent = 'Code (optional)';
+  const codePanelLabel = document.createElement('label');
+  codePanelLabel.className = 'form-label';
+  codePanelLabel.textContent = 'Code (optional)';
   const codeInput = document.createElement('textarea');
   codeInput.className = 'code-editor';
   codeInput.style.minHeight = '80px';
   codeInput.placeholder = '# Access inputs as DataFrames by filename\nresult = your_dataframe';
-  codeGroup.appendChild(codeLabel);
+  codeGroup.appendChild(codePanelLabel);
   codeGroup.appendChild(codeInput);
-  form.appendChild(codeGroup);
+  codePanel.appendChild(codeGroup);
+
+  form.appendChild(codePanel);
+
+  // ── AI Panel ──
+  const aiPanel = document.createElement('div');
+  aiPanel.hidden = true;
+
+  // Module preset selector
+  const presetGroup = document.createElement('div');
+  presetGroup.className = 'form-group';
+  const presetLabel = document.createElement('label');
+  presetLabel.className = 'form-label';
+  presetLabel.textContent = 'Module Preset';
+  const presetSelect = document.createElement('select');
+  presetSelect.className = 'form-select';
+
+  const customOpt = document.createElement('option');
+  customOpt.value = '';
+  customOpt.textContent = 'Custom (write your own prompts)';
+  presetSelect.appendChild(customOpt);
+
+  const builtInModules = getModulesForOperator(operatorCode);
+  for (const mod of builtInModules) {
+    const opt = document.createElement('option');
+    opt.value = mod.id;
+    opt.textContent = `${mod.name} (built-in)`;
+    opt.dataset.system = mod.systemPrompt;
+    opt.dataset.template = mod.buildUserPrompt ? '' : '';
+    presetSelect.appendChild(opt);
+  }
+
+  const customModules = getCustomModules().filter(m => m.operatorType === operatorCode);
+  for (const mod of customModules) {
+    const opt = document.createElement('option');
+    opt.value = mod.id;
+    opt.textContent = `${mod.name} (custom)`;
+    presetSelect.appendChild(opt);
+  }
+
+  presetGroup.appendChild(presetLabel);
+  presetGroup.appendChild(presetSelect);
+  aiPanel.appendChild(presetGroup);
+
+  // System prompt
+  const sysGroup = document.createElement('div');
+  sysGroup.className = 'form-group';
+  const sysLabel = document.createElement('label');
+  sysLabel.className = 'form-label';
+  sysLabel.textContent = 'System Prompt';
+  const sysInput = document.createElement('textarea');
+  sysInput.className = 'code-editor';
+  sysInput.style.minHeight = '60px';
+  sysInput.placeholder = 'Instructions for the AI analyst...';
+  sysGroup.appendChild(sysLabel);
+  sysGroup.appendChild(sysInput);
+  aiPanel.appendChild(sysGroup);
+
+  // User prompt template
+  const userGroup = document.createElement('div');
+  userGroup.className = 'form-group';
+  const userLabel = document.createElement('label');
+  userLabel.className = 'form-label';
+  userLabel.textContent = 'User Prompt Template';
+  const userTemplateHelp = document.createElement('span');
+  userTemplateHelp.style.cssText = 'font-size: 0.72rem; color: var(--text-muted); margin-left: 6px;';
+  userTemplateHelp.textContent = 'Use {{data}}, {{fieldNames}}, {{rowCount}}';
+  userLabel.appendChild(userTemplateHelp);
+  const userInput = document.createElement('textarea');
+  userInput.className = 'code-editor';
+  userInput.style.minHeight = '60px';
+  userInput.placeholder = 'Analyze this data:\n\n{{data}}';
+  userGroup.appendChild(userLabel);
+  userGroup.appendChild(userInput);
+  aiPanel.appendChild(userGroup);
+
+  // Data Selector section
+  const dsSection = document.createElement('div');
+  dsSection.className = 'form-group';
+  const dsLabel = document.createElement('label');
+  dsLabel.className = 'form-label';
+  dsLabel.textContent = 'Data Selector (EOQL)';
+
+  const dsGrid = document.createElement('div');
+  dsGrid.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 8px;';
+
+  // Filter expression
+  const filterWrap = document.createElement('div');
+  const filterLabel = document.createElement('label');
+  filterLabel.style.cssText = 'font-size: 0.75rem; color: var(--text-secondary);';
+  filterLabel.textContent = 'Filter expression';
+  const filterInput = document.createElement('input');
+  filterInput.className = 'form-input';
+  filterInput.placeholder = 'e.g. amount > 1000';
+  filterInput.style.fontSize = '0.82rem';
+  filterWrap.appendChild(filterLabel);
+  filterWrap.appendChild(filterInput);
+
+  // Sample size
+  const sampleWrap = document.createElement('div');
+  const sampleLabel = document.createElement('label');
+  sampleLabel.style.cssText = 'font-size: 0.75rem; color: var(--text-secondary);';
+  sampleLabel.textContent = 'Sample size (max rows)';
+  const sampleInput = document.createElement('input');
+  sampleInput.className = 'form-input';
+  sampleInput.type = 'number';
+  sampleInput.value = '50';
+  sampleInput.min = '1';
+  sampleInput.style.fontSize = '0.82rem';
+  sampleWrap.appendChild(sampleLabel);
+  sampleWrap.appendChild(sampleInput);
+
+  dsGrid.appendChild(filterWrap);
+  dsGrid.appendChild(sampleWrap);
+  dsSection.appendChild(dsLabel);
+  dsSection.appendChild(dsGrid);
+  aiPanel.appendChild(dsSection);
+
+  // Output format
+  const outGroup = document.createElement('div');
+  outGroup.className = 'form-group';
+  const outLabel = document.createElement('label');
+  outLabel.className = 'form-label';
+  outLabel.textContent = 'Output Format';
+  const outSelect = document.createElement('select');
+  outSelect.className = 'form-select';
+  for (const [val, label] of [['json_array', 'JSON Array'], ['json_object', 'JSON Object'], ['text', 'Text']]) {
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = label;
+    outSelect.appendChild(opt);
+  }
+  outGroup.appendChild(outLabel);
+  outGroup.appendChild(outSelect);
+  aiPanel.appendChild(outGroup);
+
+  form.appendChild(aiPanel);
+
+  // Module preset change handler — pre-fill prompts
+  const allModules = [...builtInModules, ...customModules];
+  presetSelect.addEventListener('change', () => {
+    const moduleId = presetSelect.value;
+    if (!moduleId) return;
+    const mod = allModules.find(m => m.id === moduleId);
+    if (mod) {
+      sysInput.value = mod.systemPrompt || '';
+      userInput.value = mod.userPromptTemplate || '';
+    }
+  });
+
+  // Mode toggle handlers
+  codeBtn.addEventListener('click', () => {
+    currentMode = 'code';
+    codeBtn.style.background = 'var(--primary)';
+    codeBtn.style.color = 'white';
+    aiBtn.style.background = 'var(--bg-secondary)';
+    aiBtn.style.color = 'var(--text-secondary)';
+    codePanel.hidden = false;
+    aiPanel.hidden = true;
+  });
+
+  aiBtn.addEventListener('click', () => {
+    currentMode = 'ai';
+    aiBtn.style.background = 'var(--primary)';
+    aiBtn.style.color = 'white';
+    codeBtn.style.background = 'var(--bg-secondary)';
+    codeBtn.style.color = 'var(--text-secondary)';
+    codePanel.hidden = true;
+    aiPanel.hidden = false;
+  });
 
   // Buttons
   const btnRow = document.createElement('div');
@@ -389,16 +655,48 @@ function _showInlineStepForm(wrapper, operatorCode, insertIndex, sessionId, view
     if (!desc) { toast('Description is required', 'error'); return; }
 
     const selectedInputs = Array.from(inputSelect.selectedOptions).map(o => o.value);
-    const code = codeInput.value;
 
     try {
-      const { stepId, helixValidation } = addStep({
-        sessionId,
-        operatorType: operatorCode,
-        description: desc,
-        inputIds: selectedInputs,
-        code
-      });
+      let stepParams;
+
+      if (currentMode === 'ai') {
+        const systemPrompt = sysInput.value.trim();
+        const userPromptTemplate = userInput.value.trim();
+        if (!systemPrompt && !userPromptTemplate) {
+          toast('AI mode requires at least a system prompt or user prompt template', 'error');
+          return;
+        }
+
+        stepParams = {
+          sessionId,
+          operatorType: operatorCode,
+          description: desc,
+          inputIds: selectedInputs,
+          executionMode: 'ai',
+          aiConfig: {
+            systemPrompt: systemPrompt || undefined,
+            userPromptTemplate: userPromptTemplate || undefined,
+            moduleId: presetSelect.value || undefined,
+            outputFormat: outSelect.value,
+            maxTokens: 4096,
+            temperature: 0.2
+          },
+          dataSelector: {
+            filter: filterInput.value.trim() || undefined,
+            sampleSize: parseInt(sampleInput.value, 10) || 50
+          }
+        };
+      } else {
+        stepParams = {
+          sessionId,
+          operatorType: operatorCode,
+          description: desc,
+          inputIds: selectedInputs,
+          code: codeInput.value
+        };
+      }
+
+      const { stepId, helixValidation } = addStep(stepParams);
 
       if (helixValidation.warnings.length > 0) {
         for (const w of helixValidation.warnings) {
