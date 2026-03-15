@@ -1,6 +1,7 @@
 /**
  * Analytical Workbench — Main Application
  * Experience Engine: G, S, M, π
+ * Sidebar layout with contextual top bar.
  */
 
 import { initDB, persistToIndexedDB } from './db.js';
@@ -17,13 +18,13 @@ import { OPERATORS, HELIX_ORDER } from './models/operators.js';
 let currentView = 'vault';
 
 const VIEWS = {
-  vault:    { label: 'Sources',       icon: 'ph ph-vault',          render: renderVaultView },
-  session:  { label: 'Workbook',      icon: 'ph ph-graph',          render: renderSessionView },
-  horizon:  { label: 'Perspectives',  icon: 'ph ph-binoculars',     render: renderHorizonView },
-  ai:       { label: 'AI Analysis',   icon: 'ph ph-sparkle',        render: renderAIView },
-  dag:      { label: 'Lineage',       icon: 'ph ph-flow-arrow',     render: renderDAGView },
-  audit:    { label: 'Audit Trail',   icon: 'ph ph-fingerprint',    render: renderAuditView },
-  export:   { label: 'Export',         icon: 'ph ph-export',         render: renderExportView }
+  vault:    { label: 'Sources',       section: 'data',      icon: '\u25A1',  render: renderVaultView },
+  session:  { label: 'Workbook',      section: 'analysis',  icon: '\u2261',  render: renderSessionView },
+  ai:       { label: 'AI Analysis',   section: 'analysis',  icon: '\u2726',  render: renderAIView },
+  audit:    { label: 'Audit Trail',   section: 'analysis',  icon: '\u25D0',  render: renderAuditView },
+  horizon:  { label: 'Perspectives',  section: 'more',      icon: '\u25C7',  render: renderHorizonView },
+  dag:      { label: 'Lineage',       section: 'more',      icon: '\u2192',  render: renderDAGView },
+  export:   { label: 'Export',         section: 'more',      icon: '\u21E5',  render: renderExportView }
 };
 
 /**
@@ -46,6 +47,7 @@ export async function initApp() {
     const schemaSQL = await schemaResponse.text();
     await initDB(sqlPromise, schemaSQL);
     renderApp();
+    _initKeyboardShortcuts();
   } catch (err) {
     app.innerHTML = `
       <div class="loading" style="min-height: 100vh; color: var(--failed-border);">
@@ -59,62 +61,111 @@ export async function initApp() {
 }
 
 /**
- * Render the full application.
+ * Render the full application with sidebar layout.
  */
 function renderApp() {
   const app = document.getElementById('app');
   app.innerHTML = '';
 
-  // Header
-  const header = document.createElement('header');
-  header.innerHTML = `
-    <h1>
-      <span class="header-icon"><i class="ph ph-atom" style="font-size: 1.3rem;"></i></span>
-      Evidence Observer
-    </h1>
+  // ── Sidebar ──
+  const sidebar = document.createElement('aside');
+  sidebar.className = 'sidebar';
+
+  // Brand
+  const brand = document.createElement('div');
+  brand.className = 'sidebar-brand';
+  brand.innerHTML = '<div class="diamond"></div> Evidence Observer';
+  sidebar.appendChild(brand);
+
+  // Sections
+  const sections = {
+    data: 'Data',
+    analysis: 'Analysis',
+    more: 'More'
+  };
+
+  for (const [sectionKey, sectionLabel] of Object.entries(sections)) {
+    const sectionHeader = document.createElement('div');
+    sectionHeader.className = 'sidebar-section';
+    sectionHeader.textContent = sectionLabel;
+    sidebar.appendChild(sectionHeader);
+
+    for (const [key, view] of Object.entries(VIEWS)) {
+      if (view.section !== sectionKey) continue;
+
+      const item = document.createElement('div');
+      item.className = `sidebar-item ${key === currentView ? 'active' : ''}`;
+      item.dataset.view = key;
+      item.innerHTML = `<span class="sidebar-icon">${view.icon}</span> ${view.label}`;
+      item.addEventListener('click', () => navigateTo(key));
+      sidebar.appendChild(item);
+    }
+  }
+
+  // Sessions section
+  const sessionsHeader = document.createElement('div');
+  sessionsHeader.className = 'sidebar-section';
+  sessionsHeader.textContent = 'Sessions';
+  sidebar.appendChild(sessionsHeader);
+
+  const newSessionItem = document.createElement('div');
+  newSessionItem.className = 'sidebar-item';
+  newSessionItem.style.color = 'var(--text-muted)';
+  newSessionItem.innerHTML = '<span class="sidebar-icon">+</span> New session';
+  newSessionItem.addEventListener('click', () => {
+    navigateTo('session');
+    // The session view handles new session creation
+  });
+  sidebar.appendChild(newSessionItem);
+
+  // Spacer
+  const spacer = document.createElement('div');
+  spacer.className = 'sidebar-spacer';
+  sidebar.appendChild(spacer);
+
+  // Settings
+  const settings = document.createElement('div');
+  settings.className = 'sidebar-settings';
+  settings.innerHTML = '<span>\u2699</span> Settings';
+  settings.addEventListener('click', () => {
+    navigateTo('ai'); // Settings are in the AI view
+  });
+  sidebar.appendChild(settings);
+
+  app.appendChild(sidebar);
+
+  // ── Main Panel ──
+  const mainPanel = document.createElement('div');
+  mainPanel.className = 'main-panel';
+
+  // Top bar
+  const topBar = document.createElement('div');
+  topBar.className = 'top-bar';
+  topBar.id = 'top-bar';
+
+  const topBarLeft = document.createElement('div');
+  topBarLeft.className = 'top-bar-left';
+  topBarLeft.innerHTML = `
+    <span class="top-bar-title" id="top-bar-title">${VIEWS[currentView].label}</span>
+    <span class="top-bar-mode" id="top-bar-mode"></span>
   `;
 
-  // Navigation
-  const nav = document.createElement('nav');
-  for (const [key, view] of Object.entries(VIEWS)) {
-    const btn = document.createElement('button');
-    btn.innerHTML = `<i class="${view.icon}"></i> ${view.label}`;
-    btn.className = key === currentView ? 'active' : '';
-    btn.addEventListener('click', () => navigateTo(key));
-    nav.appendChild(btn);
-  }
-  header.appendChild(nav);
-  app.appendChild(header);
+  const topBarRight = document.createElement('div');
+  topBarRight.className = 'top-bar-right';
+  topBarRight.id = 'top-bar-right';
 
-  // Helix bar
-  const helixContainer = document.createElement('div');
-  helixContainer.style.cssText = 'padding: 4px 24px; background: var(--bg-surface); border-bottom: 1px solid var(--border);';
-  const helixBar = document.createElement('div');
-  helixBar.className = 'helix-bar';
-  helixBar.style.justifyContent = 'center';
-  for (let i = 0; i < HELIX_ORDER.length; i++) {
-    const code = HELIX_ORDER[i];
-    const op = OPERATORS[code];
-    if (i > 0) {
-      const arrow = document.createElement('span');
-      arrow.className = 'helix-arrow';
-      arrow.textContent = '·';
-      helixBar.appendChild(arrow);
-    }
-    const step = document.createElement('span');
-    step.className = 'helix-step';
-    step.innerHTML = `${op.friendlyName}`;
-    step.title = `${op.glyph} ${code} (${op.verb}) — ${op.description}`;
-    helixBar.appendChild(step);
-  }
-  helixContainer.appendChild(helixBar);
-  app.appendChild(helixContainer);
+  topBar.appendChild(topBarLeft);
+  topBar.appendChild(topBarRight);
+  mainPanel.appendChild(topBar);
 
   // Main content area
   const main = document.createElement('main');
   main.id = 'main-content';
-  app.appendChild(main);
+  mainPanel.appendChild(main);
 
+  app.appendChild(mainPanel);
+
+  // Render current view
   VIEWS[currentView].render(main);
 }
 
@@ -125,6 +176,92 @@ function navigateTo(viewKey) {
   if (!VIEWS[viewKey]) return;
   currentView = viewKey;
   renderApp();
+}
+
+/**
+ * Update the top bar title and mode text.
+ * Views can call this to set contextual information.
+ */
+export function updateTopBar(title, mode, actions) {
+  const titleEl = document.getElementById('top-bar-title');
+  const modeEl = document.getElementById('top-bar-mode');
+  const rightEl = document.getElementById('top-bar-right');
+
+  if (titleEl && title) titleEl.textContent = title;
+  if (modeEl && mode !== undefined) modeEl.textContent = mode;
+  if (rightEl && actions) {
+    rightEl.innerHTML = '';
+    for (const action of actions) {
+      const btn = document.createElement('button');
+      btn.className = `btn ${action.primary ? 'btn-primary' : ''}`;
+      btn.textContent = action.label;
+      if (action.onClick) btn.addEventListener('click', action.onClick);
+      rightEl.appendChild(btn);
+    }
+  }
+}
+
+/**
+ * Initialize keyboard shortcuts.
+ */
+function _initKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Don't intercept if user is typing in an input/textarea
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) {
+      return;
+    }
+
+    // / — open operator picker (only in workbook view)
+    if (e.key === '/' && currentView === 'session' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const picker = document.getElementById('op-picker-bottom');
+      if (picker) picker.classList.toggle('open');
+    }
+
+    // Escape — close pickers
+    if (e.key === 'Escape') {
+      const picker = document.getElementById('op-picker-bottom');
+      if (picker) picker.classList.remove('open');
+      // Close any inline forms
+      document.querySelectorAll('.inline-step-form').forEach(f => f.remove());
+    }
+
+    // Cmd/Ctrl+Enter — run focused cell
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      if (currentView === 'session') {
+        e.preventDefault();
+        const focused = document.querySelector('.nb-cell.focused');
+        if (focused) {
+          const runBtn = focused.querySelector('[data-action="run"]');
+          if (runBtn) runBtn.click();
+        }
+      }
+    }
+
+    // Cmd/Ctrl+Shift+Enter — run all stale
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+      if (currentView === 'session') {
+        e.preventDefault();
+        const runAllBtn = document.getElementById('btn-run-all-stale');
+        if (runAllBtn) runAllBtn.click();
+      }
+    }
+
+    // Arrow keys — navigate cells
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && currentView === 'session') {
+      const cells = Array.from(document.querySelectorAll('.nb-cell'));
+      if (cells.length === 0) return;
+      const focused = document.querySelector('.nb-cell.focused');
+      let idx = focused ? cells.indexOf(focused) : -1;
+      if (e.key === 'ArrowUp') idx = Math.max(0, idx - 1);
+      else idx = Math.min(cells.length - 1, idx + 1);
+      cells.forEach(c => c.classList.remove('focused'));
+      cells[idx].classList.add('focused');
+      cells[idx].scrollIntoView({ block: 'nearest' });
+      e.preventDefault();
+    }
+  });
 }
 
 window.navigateTo = navigateTo;

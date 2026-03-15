@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evidence Observer — UX Redesign Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-elevated: #f1f5f9;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --border: #e2e8f0;
+      --border-subtle: #f1f5f9;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --radius: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+
+      /* Operator triad colors */
+      --existence-bg: #eff8ff;
+      --existence-text: #1e40af;
+      --existence-border: rgba(59,130,246,0.15);
+      --structure-bg: #f0fdf4;
+      --structure-text: #166534;
+      --structure-border: rgba(34,197,94,0.15);
+      --significance-bg: #fffbeb;
+      --significance-text: #92400e;
+      --significance-border: rgba(245,158,11,0.15);
+      --sup-bg: #faf5ff;
+      --sup-text: #6b21a8;
+      --sup-border: rgba(168,85,247,0.15);
+
+      /* Status */
+      --completed: #22c55e;
+      --stale: #eab308;
+      --failed: #ef4444;
+      --pending: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    code, .mono {
+      font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    }
+
+    /* ============ Shell Layout ============ */
+
+    #app {
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ============ Sidebar ============ */
+
+    aside.sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      border-right: 0.5px solid var(--border);
+      background: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 12px;
+      overflow-y: auto;
+      gap: 4px;
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px 16px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+    }
+
+    .sidebar-brand .diamond {
+      width: 20px;
+      height: 20px;
+      background: var(--accent);
+      transform: rotate(45deg);
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-section {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      padding: 12px 10px 4px;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.87rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border: 1px solid transparent;
+      transition: all 0.12s;
+      user-select: none;
+    }
+
+    .sidebar-item:hover {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+    }
+
+    .sidebar-item.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border-color: var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar-icon {
+      font-size: 0.8rem;
+      width: 18px;
+      text-align: center;
+      opacity: 0.6;
+    }
+
+    .sidebar-item.active .sidebar-icon { opacity: 1; }
+
+    .sidebar-spacer { flex: 1; }
+
+    .sidebar-settings {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border-top: 0.5px solid var(--border);
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .sidebar-settings:hover { color: var(--text-primary); }
+
+    /* ============ Main Panel ============ */
+
+    .main-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .top-bar {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 0.5px solid var(--border);
+      background: var(--bg-surface);
+      flex-shrink: 0;
+    }
+
+    .top-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.9rem;
+    }
+
+    .top-bar-title {
+      font-weight: 600;
+    }
+
+    .top-bar-mode {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .top-bar-right {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      transition: all 0.12s;
+    }
+    .btn:hover { background: var(--bg-elevated); border-color: #cbd5e1; }
+    .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-sm { padding: 4px 10px; font-size: 0.78rem; }
+    .btn-ghost { border: none; background: transparent; color: var(--text-secondary); }
+    .btn-ghost:hover { background: var(--bg-elevated); color: var(--text-primary); }
+
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+
+    /* ============ View: Hidden by default ============ */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ============ Notebook Cells (Workbook) ============ */
+
+    .nb-cell {
+      background: var(--bg-surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      overflow: hidden;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+
+    .nb-cell:hover {
+      box-shadow: var(--shadow);
+    }
+
+    .nb-cell--failed {
+      border-color: var(--failed);
+      background: #fef2f2;
+    }
+
+    .nb-cell--stale {
+      border-color: var(--stale);
+    }
+
+    .cell-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .op-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-width: 56px;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      flex-shrink: 0;
+    }
+
+    .op-badge.existence {
+      background: var(--existence-bg);
+      color: var(--existence-text);
+      border: 0.5px solid var(--existence-border);
+    }
+    .op-badge.structure {
+      background: var(--structure-bg);
+      color: var(--structure-text);
+      border: 0.5px solid var(--structure-border);
+    }
+    .op-badge.significance {
+      background: var(--significance-bg);
+      color: var(--significance-text);
+      border: 0.5px solid var(--significance-border);
+    }
+    .op-badge.sup {
+      background: var(--sup-bg);
+      color: var(--sup-text);
+      border: 0.5px solid var(--sup-border);
+    }
+
+    .op-badge .glyph {
+      font-size: 0.9em;
+    }
+
+    .cell-desc {
+      flex: 1;
+      font-size: 0.87rem;
+      font-weight: 500;
+    }
+
+    .cell-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.completed { background: var(--completed); }
+    .status-dot.stale { background: var(--stale); }
+    .status-dot.failed { background: var(--failed); }
+    .status-dot.pending { background: var(--pending); }
+
+    .cell-code {
+      border-top: 0.5px solid var(--border);
+      padding: 12px 16px;
+      background: var(--bg-elevated);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      color: var(--text-secondary);
+    }
+
+    .cell-output {
+      border-top: 0.5px solid var(--border);
+      padding: 0;
+    }
+
+    .output-header {
+      padding: 6px 14px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+      background: var(--bg);
+    }
+
+    /* Mini data table */
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .mini-table th {
+      text-align: left;
+      padding: 6px 14px;
+      background: var(--bg);
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .mini-table td {
+      padding: 5px 14px;
+      border-bottom: 0.5px solid var(--border-subtle);
+      color: var(--text-primary);
+    }
+    .mini-table tr:last-child td { border-bottom: none; }
+
+    /* Cell insertion */
+    .cell-insert {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      margin: 4px 0;
+      border: 1.5px dashed transparent;
+      border-radius: var(--radius);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.12s;
+      opacity: 0;
+    }
+    .cell-insert:hover, .cell-insert.always-visible {
+      opacity: 1;
+      border-color: var(--border);
+      color: var(--text-secondary);
+    }
+    .cell-insert:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(37, 99, 235, 0.03);
+    }
+
+    /* Operator picker grid */
+    .op-picker {
+      display: none;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 12px;
+      background: var(--bg-surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-md);
+      margin: 4px 0 8px;
+    }
+    .op-picker.open { display: grid; }
+
+    .op-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 0.5px solid var(--border);
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 500;
+      transition: all 0.1s;
+      background: var(--bg-surface);
+    }
+    .op-chip:hover {
+      border-color: var(--accent);
+      box-shadow: var(--shadow);
+    }
+    .op-chip .chip-glyph {
+      font-size: 1rem;
+      width: 20px;
+      text-align: center;
+    }
+    .op-chip .chip-code {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Cell error */
+    .cell-error {
+      border-top: 0.5px solid rgba(239,68,68,0.2);
+      padding: 10px 16px;
+      background: #fef2f2;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #991b1b;
+    }
+
+    /* ============ Sources View ============ */
+
+    .sources-layout {
+      display: flex;
+      gap: 20px;
+      height: 100%;
+    }
+
+    .sources-left {
+      flex: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sources-right {
+      flex: 2;
+      background: var(--bg-surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .source-dropzone {
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .source-dropzone:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .source-card {
+      background: var(--bg-surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .source-card:hover { box-shadow: var(--shadow); }
+    .source-card.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(37,99,235,0.1);
+    }
+
+    .source-name {
+      font-weight: 600;
+      font-size: 0.87rem;
+      margin-bottom: 6px;
+    }
+    .source-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .schema-tabs {
+      display: flex;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .schema-tab {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      font-family: inherit;
+    }
+    .schema-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .schema-content {
+      padding: 12px;
+      font-size: 0.82rem;
+    }
+
+    .schema-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 0.5px solid var(--border-subtle);
+    }
+    .schema-field:last-child { border-bottom: none; }
+
+    .field-name { font-weight: 500; flex: 1; }
+    .field-type {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-elevated);
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    .null-bar {
+      width: 60px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--bg-elevated);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .null-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+    .null-bar-fill.green { background: #22c55e; }
+    .null-bar-fill.amber { background: #eab308; }
+    .null-bar-fill.red { background: #ef4444; }
+
+    .null-pct {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      width: 28px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ============ AI Analysis View ============ */
+
+    .ai-controls {
+      display: flex;
+      gap: 10px;
+      padding: 16px;
+      background: var(--bg-surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      align-items: flex-end;
+    }
+
+    .ai-field {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ai-field label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .ai-field select, .ai-field input {
+      padding: 6px 10px;
+      border: 0.5px solid var(--border);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      background: var(--bg);
+      color: var(--text-primary);
+    }
+
+    .finding-card {
+      background: var(--bg-surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 10px;
+    }
+    .finding-card.severity-high {
+      border-left: 3px solid var(--failed);
+    }
+    .finding-card.severity-medium {
+      border-left: 3px solid var(--stale);
+    }
+    .finding-card.severity-low {
+      border-left: 3px solid var(--completed);
+    }
+
+    .finding-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .finding-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+      flex: 1;
+    }
+    .severity-badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .severity-badge.high { background: #fef2f2; color: #991b1b; }
+    .severity-badge.medium { background: #fffbeb; color: #92400e; }
+    .severity-badge.low { background: #f0fdf4; color: #166534; }
+
+    .finding-body {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    .save-to-session {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--accent);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .save-to-session:hover { text-decoration: underline; }
+
+    /* ============ Audit Trail View ============ */
+
+    .audit-controls {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 16px;
+      background: var(--bg-elevated);
+      border-radius: 6px;
+      padding: 2px;
+      width: fit-content;
+    }
+    .audit-toggle {
+      padding: 6px 14px;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 4px;
+      color: var(--text-secondary);
+    }
+    .audit-toggle.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      box-shadow: var(--shadow);
+    }
+
+    .audit-thread {
+      position: relative;
+    }
+
+    .audit-row {
+      display: flex;
+      gap: 14px;
+      padding: 12px 0;
+      cursor: pointer;
+    }
+    .audit-row:hover { background: rgba(37,99,235,0.02); border-radius: var(--radius); }
+
+    .audit-line-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 20px;
+      flex-shrink: 0;
+      padding-top: 4px;
+    }
+
+    .audit-line-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .audit-line-dot.completed { background: var(--completed); }
+    .audit-line-dot.stale { background: var(--stale); }
+    .audit-line-dot.failed { background: var(--failed); }
+    .audit-line-dot.pending { background: var(--pending); }
+
+    .audit-line-bar {
+      width: 2px;
+      flex: 1;
+      margin-top: 4px;
+      border-radius: 1px;
+    }
+    .audit-line-bar.completed { background: var(--completed); opacity: 0.3; }
+    .audit-line-bar.stale { background: var(--stale); opacity: 0.3; }
+    .audit-line-bar.failed { background: var(--failed); opacity: 0.3; }
+    .audit-line-bar.pending { background: var(--pending); opacity: 0.3; }
+
+    .audit-content {
+      flex: 1;
+    }
+
+    .audit-step-header {
+      font-weight: 600;
+      font-size: 0.87rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .audit-step-desc {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      line-height: 1.6;
+    }
+
+    .audit-source-cite {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .audit-notation {
+      margin-top: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      background: var(--bg-elevated);
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: var(--text-secondary);
+    }
+
+    /* ============ Keyboard hints ============ */
+    kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      background: var(--bg-elevated);
+      border: 0.5px solid var(--border);
+      border-radius: 3px;
+      color: var(--text-muted);
+    }
+
+    /* ============ Transitions ============ */
+    .fade-in {
+      animation: fadeIn 0.15s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="diamond"></div>
+      Evidence Observer
+    </div>
+
+    <div class="sidebar-section">Data</div>
+    <div class="sidebar-item" data-view="sources" onclick="switchView('sources')">
+      <span class="sidebar-icon">&#x25A1;</span> Sources
+    </div>
+
+    <div class="sidebar-section">Analysis</div>
+    <div class="sidebar-item active" data-view="workbook" onclick="switchView('workbook')">
+      <span class="sidebar-icon">&#x2261;</span> Workbook
+    </div>
+    <div class="sidebar-item" data-view="ai" onclick="switchView('ai')">
+      <span class="sidebar-icon">&#x2726;</span> AI Analysis
+    </div>
+    <div class="sidebar-item" data-view="audit" onclick="switchView('audit')">
+      <span class="sidebar-icon">&#x25D0;</span> Audit Trail
+    </div>
+
+    <div class="sidebar-section">Sessions</div>
+    <div class="sidebar-item" style="color: var(--text-muted); font-size: 0.82rem;">
+      <span class="sidebar-icon">+</span> New session
+    </div>
+
+    <div class="sidebar-spacer"></div>
+
+    <div class="sidebar-settings">
+      <span>&#x2699;</span> Settings
+    </div>
+  </aside>
+
+  <!-- Main Panel -->
+  <div class="main-panel">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <span class="top-bar-title" id="topBarTitle">NDP Surveillance Procurement</span>
+        <span class="top-bar-mode" id="topBarMode">Explore mode &middot; 4 steps &middot; 2 sources</span>
+      </div>
+      <div class="top-bar-right">
+        <button class="btn">Export</button>
+        <button class="btn btn-primary">Run all</button>
+      </div>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content-area">
+
+      <!-- ===== Workbook View ===== -->
+      <div class="view active" id="view-workbook">
+
+        <!-- Cell 1: NUL -->
+        <div class="nb-cell">
+          <div class="cell-header" onclick="toggleCell(this)">
+            <span class="op-badge existence"><span class="glyph">&empty;</span> NUL</span>
+            <span class="cell-desc">Null audit &mdash; procurement_contracts.csv</span>
+            <span class="cell-meta">
+              <span class="status-dot completed"></span>
+              847 rows &middot; 0.2s
+            </span>
+          </div>
+        </div>
+
+        <!-- Hover insert -->
+        <div class="cell-insert" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">+ insert step</div>
+
+        <!-- Cell 2: SEG (expanded) -->
+        <div class="nb-cell">
+          <div class="cell-header" onclick="toggleCell(this)">
+            <span class="op-badge structure"><span class="glyph">|</span> SEG</span>
+            <span class="cell-desc">Filter to surveillance equipment only</span>
+            <span class="cell-meta">
+              <span class="status-dot completed"></span>
+              23 rows &middot; 0.1s
+            </span>
+          </div>
+          <div class="cell-code">result = contracts[contracts['category'].str.contains('surveillance|camera|CCTV|biometric', case=False)]</div>
+          <div class="cell-output">
+            <div class="output-header">Output &middot; 23 of 847 rows</div>
+            <table class="mini-table">
+              <thead>
+                <tr>
+                  <th>vendor_name</th>
+                  <th>amount</th>
+                  <th>category</th>
+                  <th>date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Motorola Solutions</td>
+                  <td>$4,200,000</td>
+                  <td>surveillance</td>
+                  <td>2023-03-14</td>
+                </tr>
+                <tr>
+                  <td>Axon Enterprise</td>
+                  <td>$2,800,000</td>
+                  <td>camera</td>
+                  <td>2023-05-22</td>
+                </tr>
+                <tr>
+                  <td>ShotSpotter Inc</td>
+                  <td>$1,100,000</td>
+                  <td>surveillance</td>
+                  <td>2023-07-01</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="cell-insert" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">+ insert step</div>
+
+        <!-- Cell 3: CON (stale) -->
+        <div class="nb-cell nb-cell--stale">
+          <div class="cell-header" onclick="toggleCell(this)">
+            <span class="op-badge structure"><span class="glyph">&bowtie;</span> CON</span>
+            <span class="cell-desc">Join to city officials' corporate histories</span>
+            <span class="cell-meta">
+              <span class="status-dot stale"></span>
+              stale
+            </span>
+          </div>
+        </div>
+
+        <div class="cell-insert" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">+ insert step</div>
+
+        <!-- Cell 4: SYN (failed) -->
+        <div class="nb-cell nb-cell--failed">
+          <div class="cell-header" onclick="toggleCell(this)">
+            <span class="op-badge structure"><span class="glyph">&or;</span> SYN</span>
+            <span class="cell-desc">Aggregate by official &mdash; conflict of interest score</span>
+            <span class="cell-meta">
+              <span class="status-dot failed"></span>
+              failed
+            </span>
+          </div>
+          <div class="cell-error">
+            KeyError: 'official_id' — column not found in joined result.<br>
+            The upstream CON step is stale; re-run it first to refresh the schema.
+            <div style="margin-top: 8px;">
+              <button class="btn btn-sm" style="border-color: var(--failed); color: var(--failed);">Re-run</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add step (always visible) -->
+        <div class="cell-insert always-visible" onclick="togglePicker()">
+          + Add step &mdash; or press <kbd>/</kbd>
+        </div>
+
+        <!-- Operator Picker -->
+        <div class="op-picker" id="opPicker">
+          <div class="op-chip" onclick="closePicker()"><span class="chip-glyph">&empty;</span> Validate Nulls <span class="chip-code">NUL</span></div>
+          <div class="op-chip" onclick="closePicker()"><span class="chip-glyph">&#x22A1;</span> Check Types <span class="chip-code">SIG</span></div>
+          <div class="op-chip" onclick="closePicker()"><span class="chip-glyph">&#x25B3;</span> Import <span class="chip-code">INS</span></div>
+          <div class="op-chip" onclick="closePicker()"><span class="chip-glyph">|</span> Filter <span class="chip-code">SEG</span></div>
+          <div class="op-chip" onclick="closePicker()"><span class="chip-glyph">&bowtie;</span> Join <span class="chip-code">CON</span></div>
+          <div class="op-chip" onclick="closePicker()"><span class="chip-glyph">&or;</span> Merge <span class="chip-code">SYN</span></div>
+          <div class="op-chip" onclick="closePicker()"><span class="chip-glyph">&#x223F;</span> Compare <span class="chip-code">ALT</span></div>
+          <div class="op-chip" onclick="closePicker()"><span class="chip-glyph">&#x2225;</span> Branch <span class="chip-code">SUP</span></div>
+          <div class="op-chip" onclick="closePicker()"><span class="chip-glyph">&#x21AC;</span> Reconcile <span class="chip-code">REC</span></div>
+        </div>
+      </div>
+
+      <!-- ===== Sources View ===== -->
+      <div class="view" id="view-sources">
+        <div class="sources-layout">
+          <div class="sources-left">
+            <div class="source-dropzone">+ Import source</div>
+            <div class="source-grid">
+              <div class="source-card selected" onclick="selectSource(this)">
+                <div class="source-name">procurement_contracts.csv</div>
+                <div class="source-meta">
+                  <span>847 rows &middot; 12 columns</span>
+                  <span>Ingested 2023-11-14</span>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;">SHA-256: a4f3c2e8&hellip;</span>
+                </div>
+              </div>
+              <div class="source-card" onclick="selectSource(this)">
+                <div class="source-name">official_disclosures.csv</div>
+                <div class="source-meta">
+                  <span>234 rows &middot; 8 columns</span>
+                  <span>Ingested 2023-11-15</span>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;">SHA-256: 7b2d91f0&hellip;</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="sources-right">
+            <div class="schema-tabs">
+              <button class="schema-tab active">Schema</button>
+              <button class="schema-tab">Nulls</button>
+              <button class="schema-tab">Preview</button>
+            </div>
+            <div class="schema-content">
+              <div class="schema-field">
+                <span class="field-name">vendor_name</span>
+                <span class="field-type">string</span>
+                <div class="null-bar"><div class="null-bar-fill green" style="width: 0%"></div></div>
+                <span class="null-pct">0%</span>
+              </div>
+              <div class="schema-field">
+                <span class="field-name">amount</span>
+                <span class="field-type">number</span>
+                <div class="null-bar"><div class="null-bar-fill green" style="width: 2%"></div></div>
+                <span class="null-pct">2%</span>
+              </div>
+              <div class="schema-field">
+                <span class="field-name">category</span>
+                <span class="field-type">string</span>
+                <div class="null-bar"><div class="null-bar-fill green" style="width: 1%"></div></div>
+                <span class="null-pct">1%</span>
+              </div>
+              <div class="schema-field">
+                <span class="field-name">date</span>
+                <span class="field-type">date</span>
+                <div class="null-bar"><div class="null-bar-fill green" style="width: 0%"></div></div>
+                <span class="null-pct">0%</span>
+              </div>
+              <div class="schema-field">
+                <span class="field-name">contract_id</span>
+                <span class="field-type">string</span>
+                <div class="null-bar"><div class="null-bar-fill green" style="width: 0%"></div></div>
+                <span class="null-pct">0%</span>
+              </div>
+              <div class="schema-field">
+                <span class="field-name">department</span>
+                <span class="field-type">string</span>
+                <div class="null-bar"><div class="null-bar-fill amber" style="width: 12%"></div></div>
+                <span class="null-pct">12%</span>
+              </div>
+              <div class="schema-field">
+                <span class="field-name">approval_date</span>
+                <span class="field-type">date</span>
+                <div class="null-bar"><div class="null-bar-fill red" style="width: 34%"></div></div>
+                <span class="null-pct">34%</span>
+              </div>
+              <div class="schema-field">
+                <span class="field-name">contact_email</span>
+                <span class="field-type">string</span>
+                <div class="null-bar"><div class="null-bar-fill red" style="width: 67%"></div></div>
+                <span class="null-pct">67%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== AI Analysis View ===== -->
+      <div class="view" id="view-ai">
+        <div class="ai-controls">
+          <div class="ai-field">
+            <label>Source</label>
+            <select>
+              <option>procurement_contracts.csv</option>
+              <option>official_disclosures.csv</option>
+            </select>
+          </div>
+          <div class="ai-field">
+            <label>Module</label>
+            <select>
+              <option>Null Audit (NUL)</option>
+              <option>Segmentation Analysis (SEG)</option>
+              <option>Connection Discovery (CON)</option>
+              <option>Synthesis (SYN)</option>
+            </select>
+          </div>
+          <button class="btn btn-primary">Analyze</button>
+        </div>
+
+        <div class="finding-card severity-high fade-in">
+          <div class="finding-header">
+            <span class="op-badge structure" style="font-size: 0.68rem;"><span class="glyph">&bowtie;</span> CON</span>
+            <span class="finding-title">Vendor-official relationship cluster detected</span>
+            <span class="severity-badge high">High</span>
+          </div>
+          <div class="finding-body">
+            3 city officials have undisclosed financial ties to Motorola Solutions through subsidiary holdings.
+            Combined contract value: $6.8M across 4 procurement cycles. Cross-referencing with disclosure
+            filings shows zero matching entries.
+          </div>
+          <div class="save-to-session">&#x2192; Save to session as CON step</div>
+        </div>
+
+        <div class="finding-card severity-medium fade-in">
+          <div class="finding-header">
+            <span class="op-badge existence" style="font-size: 0.68rem;"><span class="glyph">&empty;</span> NUL</span>
+            <span class="finding-title">Systematic null pattern in approval_date</span>
+            <span class="severity-badge medium">Medium</span>
+          </div>
+          <div class="finding-body">
+            34% of contracts have null approval_date values. Null pattern correlates with contracts &gt;$500K
+            (87% of high-value contracts missing this field). Classification: CLEARED &mdash; dates appear to have
+            been retroactively removed from the dataset.
+          </div>
+          <div class="save-to-session">&#x2192; Save to session as NUL step</div>
+        </div>
+
+        <div class="finding-card severity-low fade-in">
+          <div class="finding-header">
+            <span class="op-badge structure" style="font-size: 0.68rem;"><span class="glyph">|</span> SEG</span>
+            <span class="finding-title">Category distribution skew</span>
+            <span class="severity-badge low">Low</span>
+          </div>
+          <div class="finding-body">
+            Surveillance-related categories account for 43% of total procurement spend but only 2.7% of contract
+            volume, indicating large individual contracts. Compare with 'office supplies' at 0.3% spend / 41% volume.
+          </div>
+          <div class="save-to-session">&#x2192; Save to session as SEG step</div>
+        </div>
+      </div>
+
+      <!-- ===== Audit Trail View ===== -->
+      <div class="view" id="view-audit">
+        <div class="audit-controls">
+          <button class="audit-toggle active" onclick="setAuditMode(this, 'public')">Public</button>
+          <button class="audit-toggle" onclick="setAuditMode(this, 'technical')">Technical</button>
+        </div>
+
+        <div class="audit-thread" id="auditThread">
+          <!-- Step 1 -->
+          <div class="audit-row" onclick="toggleAuditDetail(this)">
+            <div class="audit-line-container">
+              <div class="audit-line-dot completed"></div>
+              <div class="audit-line-bar completed"></div>
+            </div>
+            <div class="audit-content">
+              <div class="audit-step-header">
+                <span class="op-badge existence" style="font-size: 0.65rem; padding: 2px 6px;"><span class="glyph">&empty;</span> NUL</span>
+                1. Null audit on procurement data
+              </div>
+              <div class="audit-step-desc">
+                We checked the raw procurement contracts file for missing, empty, and removed data values.
+                Of 847 records and 12 fields, the approval_date column showed 34% null values classified as
+                CLEARED (previously present, now removed).
+              </div>
+              <div class="audit-source-cite">
+                Source: procurement_contracts.csv &middot; SHA-256: a4f3c2e8&hellip; &middot; 847 rows
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="audit-row" onclick="toggleAuditDetail(this)">
+            <div class="audit-line-container">
+              <div class="audit-line-dot completed"></div>
+              <div class="audit-line-bar completed"></div>
+            </div>
+            <div class="audit-content">
+              <div class="audit-step-header">
+                <span class="op-badge structure" style="font-size: 0.65rem; padding: 2px 6px;"><span class="glyph">|</span> SEG</span>
+                2. Filtered to surveillance equipment
+              </div>
+              <div class="audit-step-desc">
+                We isolated contracts related to surveillance, camera, CCTV, and biometric equipment.
+                This reduced the dataset from 847 to 23 records, representing $12.4M in total procurement.
+              </div>
+              <div class="audit-source-cite">
+                Derived from step 1 output &middot; 23 of 847 rows matched filter
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="audit-row" onclick="toggleAuditDetail(this)">
+            <div class="audit-line-container">
+              <div class="audit-line-dot stale"></div>
+              <div class="audit-line-bar stale"></div>
+            </div>
+            <div class="audit-content">
+              <div class="audit-step-header">
+                <span class="op-badge structure" style="font-size: 0.65rem; padding: 2px 6px;"><span class="glyph">&bowtie;</span> CON</span>
+                3. Join to official disclosure records
+              </div>
+              <div class="audit-step-desc" style="color: var(--stale);">
+                This step's upstream data has changed since it was last run. Results may be outdated.
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="audit-row" onclick="toggleAuditDetail(this)">
+            <div class="audit-line-container">
+              <div class="audit-line-dot failed"></div>
+            </div>
+            <div class="audit-content">
+              <div class="audit-step-header">
+                <span class="op-badge structure" style="font-size: 0.65rem; padding: 2px 6px;"><span class="glyph">&or;</span> SYN</span>
+                4. Aggregate by official
+              </div>
+              <div class="audit-step-desc" style="color: var(--failed);">
+                Failed: missing column 'official_id' in upstream result. Blocked by stale CON step.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content-area -->
+  </div><!-- /main-panel -->
+</div><!-- /app -->
+
+<script>
+  // View switching
+  function switchView(viewName) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+
+    const view = document.getElementById('view-' + viewName);
+    if (view) view.classList.add('active');
+
+    const item = document.querySelector(`.sidebar-item[data-view="${viewName}"]`);
+    if (item) item.classList.add('active');
+
+    // Update top bar
+    const titles = {
+      workbook: ['NDP Surveillance Procurement', 'Explore mode \u00b7 4 steps \u00b7 2 sources'],
+      sources:  ['Data Sources', '2 sources imported'],
+      ai:       ['AI Analysis', 'Connection Discovery module'],
+      audit:    ['Audit Trail', '4 steps \u00b7 NDP Surveillance Procurement']
+    };
+    const t = titles[viewName] || titles.workbook;
+    document.getElementById('topBarTitle').textContent = t[0];
+    document.getElementById('topBarMode').textContent = t[1];
+  }
+
+  // Toggle cell expansion
+  function toggleCell(headerEl) {
+    const cell = headerEl.parentElement;
+    const code = cell.querySelector('.cell-code');
+    const output = cell.querySelector('.cell-output');
+    const error = cell.querySelector('.cell-error');
+
+    if (code) code.style.display = code.style.display === 'none' ? '' : 'none';
+    if (output) output.style.display = output.style.display === 'none' ? '' : 'none';
+    if (error) error.style.display = error.style.display === 'none' ? '' : 'none';
+  }
+
+  // Operator picker
+  function togglePicker() {
+    const picker = document.getElementById('opPicker');
+    picker.classList.toggle('open');
+  }
+  function closePicker() {
+    document.getElementById('opPicker').classList.remove('open');
+  }
+
+  // Source selection
+  function selectSource(card) {
+    document.querySelectorAll('.source-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+  }
+
+  // Audit mode toggle
+  function setAuditMode(btn, mode) {
+    document.querySelectorAll('.audit-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // In technical mode, show notation blocks
+    const thread = document.getElementById('auditThread');
+    const notations = thread.querySelectorAll('.audit-notation');
+    if (mode === 'technical') {
+      // Add notation blocks if not present
+      const rows = thread.querySelectorAll('.audit-row');
+      rows.forEach((row, i) => {
+        if (!row.querySelector('.audit-notation')) {
+          const notations = [
+            '\u2205(procurement_contracts) \u2192 {CLEARED: 289, UNKNOWN: 0, NEVER_SET: 0} \u2713\u03b3',
+            '|(category \u2287 surveillance|camera|CCTV|biometric) \u2192 23/847 \u2713\u03b3',
+            '\u22c8(surveillance_contracts, official_disclosures) ON vendor_id \u2192 [stale]',
+            '\u2228(official_id, SUM(amount), COI_score) \u2192 [failed: KeyError]'
+          ];
+          const n = document.createElement('div');
+          n.className = 'audit-notation';
+          n.textContent = notations[i] || '';
+          row.querySelector('.audit-content').appendChild(n);
+        }
+      });
+    } else {
+      thread.querySelectorAll('.audit-notation').forEach(n => n.remove());
+    }
+  }
+
+  // Toggle audit detail
+  function toggleAuditDetail(row) {
+    const desc = row.querySelector('.audit-step-desc');
+    if (desc) {
+      desc.style.display = desc.style.display === 'none' ? '' : 'none';
+    }
+  }
+
+  // Keyboard shortcut: / opens picker
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+      const active = document.getElementById('view-workbook');
+      if (active && active.classList.contains('active')) {
+        e.preventDefault();
+        togglePicker();
+      }
+    }
+    if (e.key === 'Escape') {
+      closePicker();
+    }
+  });
+</script>
+
+</body>
+</html>

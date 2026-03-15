@@ -1,13 +1,15 @@
 /**
- * Session View — Meant-Graph Browser
- * Create sessions, manage steps, view execution results.
+ * Session View — Notebook-Style Workbook
+ * Inline notebook cells with collapsible code/output zones.
+ * Inline step insertion with operator picker.
  */
 
 import { getAllSessions } from '../models/meant_graph.js';
 import { getAllSources } from '../models/given_log.js';
 import { OPERATORS, formatOperator, formatOperatorFriendly } from '../models/operators.js';
 import { startSession, addStep, executeStep, getSessionChain } from '../meant/service.js';
-import { renderOperatorSelector, renderHelixBar, renderDataTable, renderModal, html, toast } from './components.js';
+import { renderOperatorPicker, renderMiniTable, renderHelixBar, renderDataTable, renderModal, createOpBadge, getTriadClass, html, toast } from './components.js';
+import { updateTopBar } from '../app.js';
 
 let _currentSessionId = null;
 
@@ -17,40 +19,24 @@ let _currentSessionId = null;
 export function renderSessionView(container) {
   container.innerHTML = '';
 
-  const view = html`
-    <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
-          <i class="ph ph-graph" style="color: var(--meant-border); font-size: 1.3rem;"></i>
-          Workbook
-        </h2>
-        <button class="btn btn-primary" id="btn-new-session"><i class="ph ph-plus"></i> New Session</button>
-      </div>
-    </div>
-  `;
-
-  // Session list or active session
-  const contentArea = document.createElement('div');
-
   if (_currentSessionId) {
-    _renderActiveSession(contentArea, _currentSessionId);
+    _renderActiveSession(container, _currentSessionId);
   } else {
-    _renderSessionList(contentArea);
+    _renderSessionList(container);
   }
-
-  view.appendChild(contentArea);
-
-  // Bind new session button
-  view.querySelector('#btn-new-session').addEventListener('click', () => {
-    _showNewSessionModal(contentArea);
-  });
-
-  container.appendChild(view);
 }
 
 function _renderSessionList(container) {
   container.innerHTML = '';
   const sessions = getAllSessions();
+
+  updateTopBar('Workbook', `${sessions.length} session${sessions.length !== 1 ? 's' : ''}`, [
+    {
+      label: 'New Session',
+      primary: true,
+      onClick: () => _showNewSessionModal(container)
+    }
+  ]);
 
   if (sessions.length === 0) {
     container.innerHTML = `
@@ -65,13 +51,13 @@ function _renderSessionList(container) {
   for (const session of sessions) {
     const card = html`
       <div class="card" style="cursor: pointer;">
-        <div class="card-header">
-          <span class="op-glyph significance"><i class="ph ph-graph" style="font-size: 1rem;"></i></span>
+        <div class="card-header" style="margin-bottom: 0;">
+          <span class="op-glyph significance" style="width:28px;height:28px;font-size:0.9rem;"><i class="ph ph-graph"></i></span>
           <div style="flex: 1;">
             <div class="card-title">${session.name}</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">
-              Mode: ${session.mode} · ${new Date(session.created_at).toLocaleString()}
-              ${session.description ? ` · ${session.description}` : ''}
+            <div style="font-size: 0.78rem; color: var(--text-muted);">
+              ${session.mode} mode \u00b7 ${new Date(session.created_at).toLocaleDateString()}
+              ${session.description ? ` \u00b7 ${session.description}` : ''}
             </div>
           </div>
           <span class="meant-badge">${session.mode}</span>
@@ -90,92 +76,401 @@ function _renderActiveSession(container, sessionId) {
   container.innerHTML = '';
 
   const chain = getSessionChain(sessionId);
-  const session = chain.length > 0 ? { id: sessionId } : null;
 
-  // Back button
-  const backBtn = html`<button class="btn btn-sm" style="margin-bottom: 16px;"><i class="ph ph-arrow-left"></i> Back to sessions</button>`;
-  backBtn.addEventListener('click', () => {
-    _currentSessionId = null;
-    _renderSessionList(container);
-  });
-  container.appendChild(backBtn);
+  // Find session name from chain or sessions list
+  const sessions = getAllSessions();
+  const sessionObj = sessions.find(s => s.id === sessionId);
+  const sessionName = sessionObj?.name || 'Session';
+  const sessionMode = sessionObj?.mode || 'explore';
+  const staleCount = chain.filter(s => s.status === 'stale').length;
 
-  // Helix bar showing which operators have been used
-  const usedOps = new Set(chain.map(s => s.operator_type));
-  const helixBar = renderHelixBar();
-  helixBar.querySelectorAll('.helix-step').forEach(el => {
-    const code = el.dataset.operator;
-    if (usedOps.has(code)) {
-      el.classList.add('active');
+  updateTopBar(sessionName, `${sessionMode} mode \u00b7 ${chain.length} step${chain.length !== 1 ? 's' : ''}`, [
+    {
+      label: '\u2190 Sessions',
+      onClick: () => {
+        _currentSessionId = null;
+        _renderSessionList(container);
+      }
+    },
+    ...(staleCount > 0 ? [{
+      label: `Run ${staleCount} stale`,
+      onClick: () => _runAllStale(chain, sessionId, container)
+    }] : []),
+    {
+      label: 'Run all',
+      primary: true,
+      onClick: () => _runAll(chain, sessionId, container)
     }
-  });
-  container.appendChild(helixBar);
+  ]);
 
-  // Steps
+  // Render notebook cells
   if (chain.length === 0) {
     container.appendChild(html`
       <div class="empty-state" style="padding: 30px;">
-        <p>No steps yet. Add a step to begin analysis.</p>
+        <p>No steps yet. Add a step below to begin analysis.</p>
       </div>
     `);
   } else {
-    for (const step of chain) {
-      container.appendChild(_renderStepCard(step, container, sessionId));
+    for (let i = 0; i < chain.length; i++) {
+      const step = chain[i];
+
+      // Render cell
+      container.appendChild(_renderNotebookCell(step, i, sessionId, container));
+
+      // Insertion target between cells (not after the last one — the bottom one covers that)
+      if (i < chain.length - 1) {
+        container.appendChild(_renderInsertionTarget(i + 1, sessionId, container, false));
+      }
     }
   }
 
-  // Add step button
-  const addBtn = html`<button class="btn btn-primary" style="margin-top: 12px;"><i class="ph ph-plus"></i> Add Step</button>`;
-  addBtn.addEventListener('click', () => {
-    _showAddStepModal(sessionId, container);
-  });
-  container.appendChild(addBtn);
+  // Bottom insertion target (always visible)
+  container.appendChild(_renderInsertionTarget(chain.length, sessionId, container, true));
 }
 
-function _renderStepCard(step, container, sessionId) {
-  const op = step.operator;
-  const card = html`
-    <div class="step-card ${step.status === 'stale' ? 'stale' : ''} ${step.operator_type === 'SUP' ? 'sup-unresolved' : ''}">
-      <div class="card-header">
-        <span class="op-glyph ${op.triad.toLowerCase()}">${op.glyph}</span>
-        <div style="flex: 1;">
-          <div class="card-title">
-            Step ${step.sequence_number}: ${formatOperatorFriendly(step.operator_type)} — ${step.description}
-          </div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            ${op.verb} · Status: <span class="status-${step.status}">${step.status}</span>
-            ${step.executionLog ? ` · ${step.executionLog.rowsIn || 0} → ${step.executionLog.rowsOut || 0} rows · ${step.executionLog.runtime_ms || 0}ms` : ''}
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
+// ============ Notebook Cell ============
 
-  // Click to show detail
-  card.addEventListener('click', () => {
-    _showStepDetail(step, sessionId, container);
+function _renderNotebookCell(step, index, sessionId, viewContainer) {
+  const op = step.operator || OPERATORS[step.operator_type];
+  const triadClass = getTriadClass(step.operator_type);
+  const statusClass = (step.status === 'failed') ? 'nb-cell--failed' : (step.status === 'stale') ? 'nb-cell--stale' : '';
+
+  const cell = document.createElement('div');
+  cell.className = `nb-cell ${statusClass}`;
+  cell.dataset.stepId = step.id;
+
+  // ── Header (always visible) ──
+  const header = document.createElement('div');
+  header.className = 'cell-header';
+
+  const badge = createOpBadge(step.operator_type);
+
+  const desc = document.createElement('span');
+  desc.className = 'cell-desc';
+  desc.textContent = step.description;
+
+  const meta = document.createElement('span');
+  meta.className = 'cell-meta';
+
+  const dot = document.createElement('span');
+  dot.className = `status-dot ${step.status}`;
+  meta.appendChild(dot);
+
+  if (step.executionLog?.rowsOut !== undefined) {
+    const rowInfo = document.createTextNode(` ${step.executionLog.rowsOut} rows`);
+    meta.appendChild(rowInfo);
+  }
+  if (step.executionLog?.runtime_ms !== undefined) {
+    const runtime = document.createTextNode(` \u00b7 ${step.executionLog.runtime_ms < 1000 ? step.executionLog.runtime_ms + 'ms' : (step.executionLog.runtime_ms / 1000).toFixed(1) + 's'}`);
+    meta.appendChild(runtime);
+  }
+  if (step.status === 'stale') {
+    meta.appendChild(document.createTextNode(' stale'));
+  }
+  if (step.status === 'failed') {
+    meta.appendChild(document.createTextNode(' failed'));
+  }
+
+  header.appendChild(badge);
+  header.appendChild(desc);
+  header.appendChild(meta);
+
+  // Toggle expand/collapse on header click
+  header.addEventListener('click', () => {
+    const codeEl = cell.querySelector('.cell-code');
+    const outputEl = cell.querySelector('.cell-output');
+    const errorEl = cell.querySelector('.cell-error');
+    if (codeEl) codeEl.hidden = !codeEl.hidden;
+    if (outputEl) outputEl.hidden = !outputEl.hidden;
+    if (errorEl) errorEl.hidden = !errorEl.hidden;
   });
 
-  // Show warnings
-  if (step.executionLog?.warnings?.length > 0) {
-    const warnings = html`<div style="margin-top: 8px; font-size: 0.8rem; color: var(--stale-border); padding-left: 44px;"></div>`;
-    for (const w of step.executionLog.warnings) {
-      warnings.appendChild(html`<div>⚠ ${w}</div>`);
+  cell.appendChild(header);
+
+  // ── Code body (collapsible) ──
+  if (step.code) {
+    const codeBody = document.createElement('div');
+    codeBody.className = 'cell-code';
+    codeBody.textContent = step.code;
+    // Default: collapsed for completed, open for pending/failed
+    codeBody.hidden = (step.status === 'completed' || step.status === 'stale');
+    cell.appendChild(codeBody);
+  }
+
+  // ── Output panel (collapsible) ──
+  if ((step.status === 'completed' || step.status === 'stale') && step.outputs && step.outputs.length > 0) {
+    const outputPanel = document.createElement('div');
+    outputPanel.className = 'cell-output';
+
+    for (const output of step.outputs) {
+      try {
+        const data = output.data_json ? JSON.parse(output.data_json) : [];
+        if (data.length > 0) {
+          const columns = Object.keys(data[0]);
+
+          const outputHeader = document.createElement('div');
+          outputHeader.className = 'output-header';
+          outputHeader.textContent = `Output \u00b7 ${data.length} row${data.length !== 1 ? 's' : ''}`;
+          outputPanel.appendChild(outputHeader);
+
+          const tableWrapper = renderMiniTable(data, columns, 5);
+          outputPanel.appendChild(tableWrapper);
+        }
+      } catch (e) {
+        // Skip if data can't be parsed
+      }
     }
-    card.appendChild(warnings);
+
+    cell.appendChild(outputPanel);
   }
 
-  // Show notation
+  // ── Error display (for failed steps) ──
+  if (step.status === 'failed') {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'cell-error';
+
+    const errorMsg = step.executionLog?.error || step.error || 'Step failed';
+    errorDiv.textContent = errorMsg;
+
+    const rerunBtn = document.createElement('button');
+    rerunBtn.className = 'btn btn-sm';
+    rerunBtn.style.cssText = 'margin-top: 8px; border-color: var(--failed-border); color: var(--failed-border);';
+    rerunBtn.textContent = 'Re-run';
+    rerunBtn.dataset.action = 'run';
+    rerunBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await _rerunStep(step.id, sessionId, viewContainer);
+    });
+    errorDiv.appendChild(rerunBtn);
+
+    cell.appendChild(errorDiv);
+  }
+
+  // ── Notation (if present, shown small) ──
   if (step.notation) {
-    const notation = html`
-      <div class="notation" style="margin-top: 8px; margin-left: 44px; font-size: 0.8rem;">
-        ${step.notation.text || JSON.stringify(step.notation)}
-      </div>
-    `;
-    card.appendChild(notation);
+    const notationText = typeof step.notation === 'string' ? step.notation : (step.notation.text || '');
+    if (notationText) {
+      const notation = document.createElement('div');
+      notation.style.cssText = 'padding: 4px 14px 6px; font-size: 0.72rem; color: var(--text-muted); font-family: "JetBrains Mono", monospace;';
+      notation.textContent = notationText;
+      cell.appendChild(notation);
+    }
   }
 
-  return card;
+  return cell;
+}
+
+// ============ Insertion Targets ============
+
+function _renderInsertionTarget(insertIndex, sessionId, viewContainer, isBottom) {
+  const wrapper = document.createElement('div');
+
+  const target = document.createElement('div');
+  target.className = `cell-insert ${isBottom ? 'always-visible' : ''}`;
+  target.textContent = isBottom ? '+ Add step \u2014 or press /' : '+ insert step';
+
+  if (isBottom) {
+    target.innerHTML = '+ Add step \u2014 or press <kbd>/</kbd>';
+  }
+
+  target.addEventListener('click', () => {
+    // Remove any existing pickers/forms
+    document.querySelectorAll('.op-picker.open').forEach(p => {
+      if (p.id !== 'op-picker-' + insertIndex) p.classList.remove('open');
+    });
+    document.querySelectorAll('.inline-step-form').forEach(f => f.remove());
+
+    // Toggle picker
+    let picker = wrapper.querySelector('.op-picker');
+    if (picker) {
+      picker.classList.toggle('open');
+    } else {
+      picker = renderOperatorPicker((code) => {
+        picker.classList.remove('open');
+        _showInlineStepForm(wrapper, code, insertIndex, sessionId, viewContainer);
+      });
+      picker.id = isBottom ? 'op-picker-bottom' : 'op-picker-' + insertIndex;
+      wrapper.appendChild(picker);
+    }
+  });
+
+  wrapper.appendChild(target);
+  return wrapper;
+}
+
+function _showInlineStepForm(wrapper, operatorCode, insertIndex, sessionId, viewContainer) {
+  // Remove any existing form
+  wrapper.querySelectorAll('.inline-step-form').forEach(f => f.remove());
+
+  const op = OPERATORS[operatorCode];
+  const form = document.createElement('div');
+  form.className = 'inline-step-form';
+
+  const badge = createOpBadge(operatorCode);
+  badge.style.marginBottom = '10px';
+  form.appendChild(badge);
+
+  // Description
+  const descGroup = document.createElement('div');
+  descGroup.className = 'form-group';
+  const descLabel = document.createElement('label');
+  descLabel.className = 'form-label';
+  descLabel.textContent = 'Description';
+  const descInput = document.createElement('input');
+  descInput.className = 'form-input';
+  descInput.placeholder = `What does this ${op.friendlyName} step do?`;
+  descGroup.appendChild(descLabel);
+  descGroup.appendChild(descInput);
+  form.appendChild(descGroup);
+
+  // Input selector
+  const inputGroup = document.createElement('div');
+  inputGroup.className = 'form-group';
+  const inputLabel = document.createElement('label');
+  inputLabel.className = 'form-label';
+  inputLabel.textContent = 'Input';
+  const inputSelect = document.createElement('select');
+  inputSelect.className = 'form-select';
+  inputSelect.multiple = true;
+  inputSelect.style.minHeight = '60px';
+
+  const sources = getAllSources();
+  for (const source of sources) {
+    const opt = document.createElement('option');
+    opt.value = source.id;
+    opt.textContent = `${source.filename} (${source.row_count} rows)`;
+    inputSelect.appendChild(opt);
+  }
+
+  const chain = getSessionChain(sessionId);
+  for (const step of chain) {
+    if (step.outputs) {
+      for (const output of step.outputs) {
+        const opt = document.createElement('option');
+        opt.value = step.id;
+        opt.textContent = `Step ${step.sequence_number}: ${OPERATORS[step.operator_type].friendlyName} \u2014 ${output.name} (${output.row_count || '?'} rows)`;
+        inputSelect.appendChild(opt);
+      }
+    }
+  }
+
+  inputGroup.appendChild(inputLabel);
+  inputGroup.appendChild(inputSelect);
+  form.appendChild(inputGroup);
+
+  // Code
+  const codeGroup = document.createElement('div');
+  codeGroup.className = 'form-group';
+  const codeLabel = document.createElement('label');
+  codeLabel.className = 'form-label';
+  codeLabel.textContent = 'Code (optional)';
+  const codeInput = document.createElement('textarea');
+  codeInput.className = 'code-editor';
+  codeInput.style.minHeight = '80px';
+  codeInput.placeholder = '# Access inputs as DataFrames by filename\nresult = your_dataframe';
+  codeGroup.appendChild(codeLabel);
+  codeGroup.appendChild(codeInput);
+  form.appendChild(codeGroup);
+
+  // Buttons
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display: flex; gap: 8px; justify-content: flex-end;';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => form.remove());
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn btn-primary';
+  addBtn.textContent = 'Add & run';
+  addBtn.addEventListener('click', async () => {
+    const desc = descInput.value.trim();
+    if (!desc) { toast('Description is required', 'error'); return; }
+
+    const selectedInputs = Array.from(inputSelect.selectedOptions).map(o => o.value);
+    const code = codeInput.value;
+
+    try {
+      const { stepId, helixValidation } = addStep({
+        sessionId,
+        operatorType: operatorCode,
+        description: desc,
+        inputIds: selectedInputs,
+        code
+      });
+
+      if (helixValidation.warnings.length > 0) {
+        for (const w of helixValidation.warnings) {
+          toast(`\u26A0 ${w}`, 'info');
+        }
+      }
+
+      toast(`Executing ${op.friendlyName}...`, 'info');
+      const result = await executeStep(stepId);
+
+      if (result.success) {
+        toast(`${op.friendlyName} completed: ${result.executionLog.rowsOut} rows`, 'success');
+      } else {
+        toast(`${op.friendlyName} failed: ${result.error}`, 'error');
+      }
+
+      _renderActiveSession(viewContainer, sessionId);
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'error');
+    }
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(addBtn);
+  form.appendChild(btnRow);
+
+  wrapper.appendChild(form);
+  descInput.focus();
+}
+
+// ============ Actions ============
+
+async function _rerunStep(stepId, sessionId, viewContainer) {
+  toast('Re-running step...', 'info');
+  try {
+    const result = await executeStep(stepId);
+    if (result.success) {
+      toast(`Completed: ${result.executionLog.rowsOut} rows`, 'success');
+    } else {
+      toast(`Failed: ${result.error}`, 'error');
+    }
+    _renderActiveSession(viewContainer, sessionId);
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+}
+
+async function _runAll(chain, sessionId, viewContainer) {
+  for (const step of chain) {
+    if (step.status !== 'completed') {
+      try {
+        await executeStep(step.id);
+      } catch (e) {
+        toast(`Step ${step.sequence_number} failed: ${e.message}`, 'error');
+        break;
+      }
+    }
+  }
+  _renderActiveSession(viewContainer, sessionId);
+}
+
+async function _runAllStale(chain, sessionId, viewContainer) {
+  for (const step of chain) {
+    if (step.status === 'stale') {
+      try {
+        await executeStep(step.id);
+      } catch (e) {
+        toast(`Step ${step.sequence_number} failed: ${e.message}`, 'error');
+      }
+    }
+  }
+  _renderActiveSession(viewContainer, sessionId);
 }
 
 function _showNewSessionModal(container) {
@@ -192,8 +487,8 @@ function _showNewSessionModal(container) {
       <div class="form-group">
         <label class="form-label">Mode</label>
         <select class="form-select" id="session-mode">
-          <option value="explore">Explore — ordering issues warned, not blocked</option>
-          <option value="confirm">Confirm — ordering issues block export</option>
+          <option value="explore">Explore \u2014 ordering issues warned, not blocked</option>
+          <option value="confirm">Confirm \u2014 ordering issues block export</option>
         </select>
       </div>
     </div>
@@ -219,190 +514,6 @@ function _showNewSessionModal(container) {
         _renderActiveSession(container, sessionId);
       }
     }
-  ]);
-}
-
-function _showAddStepModal(sessionId, container) {
-  let selectedOp = null;
-
-  const form = html`<div></div>`;
-
-  // Operator selector
-  const opLabel = html`<div class="form-group"><label class="form-label">Operation Type</label></div>`;
-  const opSelector = renderOperatorSelector((code) => { selectedOp = code; });
-  opLabel.appendChild(opSelector);
-  form.appendChild(opLabel);
-
-  // Description
-  form.appendChild(html`
-    <div class="form-group">
-      <label class="form-label">Description (required)</label>
-      <input class="form-input" id="step-desc" placeholder="What does this step do and why?">
-    </div>
-  `);
-
-  // Input selector
-  const inputGroup = html`<div class="form-group"><label class="form-label">Inputs</label></div>`;
-  const inputSelect = document.createElement('select');
-  inputSelect.className = 'form-select';
-  inputSelect.multiple = true;
-  inputSelect.style.minHeight = '80px';
-  inputSelect.id = 'step-inputs';
-
-  // Add Given-Log sources
-  const sources = getAllSources();
-  for (const source of sources) {
-    const opt = document.createElement('option');
-    opt.value = source.id;
-    opt.textContent = `[Source] ${source.filename} (${source.row_count} rows)`;
-    inputSelect.appendChild(opt);
-  }
-
-  // Add prior step outputs
-  const chain = getSessionChain(sessionId);
-  for (const step of chain) {
-    if (step.outputs) {
-      for (const output of step.outputs) {
-        const opt = document.createElement('option');
-        opt.value = step.id;
-        opt.textContent = `[Step ${step.sequence_number}] ${OPERATORS[step.operator_type].friendlyName} — ${output.name} (${output.row_count || '?'} rows)`;
-        inputSelect.appendChild(opt);
-      }
-    }
-  }
-
-  inputGroup.appendChild(inputSelect);
-  form.appendChild(inputGroup);
-
-  // Code
-  form.appendChild(html`
-    <div class="form-group">
-      <label class="form-label">Code (Python or JavaScript)</label>
-      <textarea class="code-editor" id="step-code" placeholder="# Access inputs as DataFrames by filename (e.g., campaign_finance)
-# Set result = your_dataframe to capture output
-
-result = campaign_finance[campaign_finance['district'] == 'District 1']"></textarea>
-    </div>
-  `);
-
-  renderModal('Add Step', form, [
-    { label: 'Cancel' },
-    {
-      label: 'Add & Execute',
-      primary: true,
-      onClick: async () => {
-        if (!selectedOp) { toast('Select an operator type', 'error'); return; }
-        const desc = document.getElementById('step-desc').value.trim();
-        if (!desc) { toast('Description is required', 'error'); return; }
-
-        const selectedInputs = Array.from(document.getElementById('step-inputs').selectedOptions).map(o => o.value);
-        const code = document.getElementById('step-code').value;
-
-        try {
-          const { stepId, helixValidation } = addStep({
-            sessionId,
-            operatorType: selectedOp,
-            description: desc,
-            inputIds: selectedInputs,
-            code
-          });
-
-          // Show helix warnings
-          if (helixValidation.warnings.length > 0) {
-            for (const w of helixValidation.warnings) {
-              toast(`⚠ ${w}`, 'info');
-            }
-          }
-
-          // Execute
-          toast(`Executing ${formatOperatorFriendly(selectedOp)}...`, 'info');
-          const result = await executeStep(stepId);
-
-          if (result.success) {
-            toast(`${formatOperatorFriendly(selectedOp)} completed: ${result.executionLog.rowsOut} rows`, 'success');
-          } else {
-            toast(`${formatOperatorFriendly(selectedOp)} failed: ${result.error}`, 'error');
-          }
-
-          _renderActiveSession(container, sessionId);
-        } catch (err) {
-          toast(`Error: ${err.message}`, 'error');
-        }
-      }
-    }
-  ]);
-}
-
-function _showStepDetail(step, sessionId, container) {
-  const content = html`<div></div>`;
-
-  // Metadata
-  const op = OPERATORS[step.operator_type];
-  content.appendChild(html`
-    <div style="margin-bottom: 16px;">
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem;">
-        <div><strong>Operation:</strong> ${op.friendlyName} (${op.code})</div>
-        <div><strong>Status:</strong> <span class="status-${step.status}">${step.status}</span></div>
-        <div><strong>Category:</strong> ${op.triad}</div>
-        <div><strong>Role:</strong> ${op.role}</div>
-      </div>
-    </div>
-  `);
-
-  // Code
-  if (step.code) {
-    content.appendChild(html`
-      <div class="form-group">
-        <label class="form-label">Code</label>
-        <pre class="notation">${step.code}</pre>
-      </div>
-    `);
-  }
-
-  // Notation
-  if (step.notation) {
-    const notationText = typeof step.notation === 'string' ? step.notation : (step.notation.text || JSON.stringify(step.notation, null, 2));
-    content.appendChild(html`
-      <div class="form-group">
-        <label class="form-label">Formal Notation</label>
-        <pre class="notation">${notationText}</pre>
-      </div>
-    `);
-  }
-
-  // Execution log
-  if (step.executionLog) {
-    content.appendChild(html`
-      <div class="form-group">
-        <label class="form-label">Execution Log</label>
-        <pre class="notation">${JSON.stringify(step.executionLog, null, 2)}</pre>
-      </div>
-    `);
-  }
-
-  // Output preview
-  if (step.outputs && step.outputs.length > 0) {
-    for (const output of step.outputs) {
-      const outputDiv = html`<div class="form-group"><label class="form-label">Output: ${output.name} (${output.row_count || '?'} rows)</label></div>`;
-      try {
-        const data = output.data_json ? JSON.parse(output.data_json) : [];
-        if (data.length > 0) {
-          const columns = Object.keys(data[0]);
-          const table = renderDataTable(data.slice(0, 20), columns);
-          outputDiv.appendChild(table);
-          if (data.length > 20) {
-            outputDiv.appendChild(html`<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Showing 20 of ${data.length} rows</div>`);
-          }
-        }
-      } catch (e) {
-        outputDiv.appendChild(html`<div style="color: var(--text-muted);">Could not parse output data</div>`);
-      }
-      content.appendChild(outputDiv);
-    }
-  }
-
-  renderModal(`Step ${step.sequence_number}: ${formatOperatorFriendly(step.operator_type)}`, content, [
-    { label: 'Close' }
   ]);
 }
 

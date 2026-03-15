@@ -1,14 +1,17 @@
 /**
  * Vault View — Given-Log Browser
+ * Two-panel Airtable-style layout with inline schema/null/preview tabs.
  * INS(△) anchors displayed with immutable visual treatment.
- * Upload, inspect, and review Given data sources.
  */
 
 import { getAllSources, getSource, getAnchors } from '../models/given_log.js';
 import { ins_ingest, getSourceData } from '../given/service.js';
 import { formatOperator, NullState, OPERATORS } from '../models/operators.js';
-import { renderDataTable, renderDropzone, renderModal, html, toast } from './components.js';
+import { renderDataTable, renderMiniTable, renderDropzone, renderModal, html, toast } from './components.js';
+import { updateTopBar } from '../app.js';
 import { nul_audit } from '../given/nul.js';
+
+let _selectedSourceId = null;
 
 /**
  * Render the vault view.
@@ -16,206 +19,275 @@ import { nul_audit } from '../given/nul.js';
 export function renderVaultView(container) {
   container.innerHTML = '';
 
-  const view = html`
-    <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
-          <i class="ph ph-vault" style="color: var(--given-border); font-size: 1.3rem;"></i>
-          Sources
-        </h2>
-        <span class="given-badge"><i class="ph ph-lock-simple" style="font-size: 0.7rem;"></i> Immutable</span>
-      </div>
-    </div>
-  `;
+  const sources = getAllSources();
 
-  // File upload dropzone
+  updateTopBar('Data Sources', `${sources.length} source${sources.length !== 1 ? 's' : ''} imported`);
+
+  // Two-panel layout
+  const layout = document.createElement('div');
+  layout.className = 'sources-layout';
+
+  // ── Left panel: dropzone + source grid ──
+  const left = document.createElement('div');
+  left.className = 'sources-left';
+
+  // Compact dropzone
   const dropzone = renderDropzone(async (file) => {
     try {
       toast('Ingesting file...', 'info');
       const result = await ins_ingest(file);
 
       if (result.status === 'duplicate') {
-        toast('Duplicate — this file has already been imported', 'error');
+        toast('Duplicate \u2014 this file has already been imported', 'error');
         return;
       }
 
       toast(`Ingested: ${result.rowCount} rows, ${result.columnCount} columns`, 'success');
-
-      // Show schema review modal
       _showSchemaReview(result);
-
-      // Re-render source list
-      _renderSourceList(sourceListContainer);
+      renderVaultView(container);
     } catch (err) {
       toast(`Upload failed: ${err.message}`, 'error');
       console.error(err);
     }
-  });
-  view.appendChild(dropzone);
-
-  // Source list
-  const sourceListContainer = document.createElement('div');
-  sourceListContainer.style.marginTop = '24px';
-  _renderSourceList(sourceListContainer);
-  view.appendChild(sourceListContainer);
-
-  container.appendChild(view);
-}
-
-/**
- * Render the list of Given-Log sources.
- */
-function _renderSourceList(container) {
-  container.innerHTML = '';
-
-  const sources = getAllSources();
+  }, true);
+  left.appendChild(dropzone);
 
   if (sources.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon"><i class="ph ph-empty" style="font-size: 3rem;"></i></div>
-        <p>No data sources yet.<br>
-        Upload a CSV or JSON file to begin.</p>
+    const empty = html`
+      <div class="empty-state" style="padding: 40px 20px;">
+        <div class="empty-icon"><i class="ph ph-file-arrow-up" style="font-size: 3rem;"></i></div>
+        <p>No data sources yet.<br>Upload a CSV or JSON file to begin.</p>
       </div>
     `;
-    return;
+    left.appendChild(empty);
+  } else {
+    // Source grid (2 columns)
+    const grid = document.createElement('div');
+    grid.className = 'source-grid';
+
+    // Auto-select first source if none selected
+    if (!_selectedSourceId && sources.length > 0) {
+      _selectedSourceId = sources[0].id;
+    }
+
+    for (const source of sources) {
+      const card = _renderSourceCard(source);
+      grid.appendChild(card);
+    }
+
+    left.appendChild(grid);
   }
 
-  const heading = html`
-    <h3 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-secondary);">
-      ${sources.length} source${sources.length !== 1 ? 's' : ''} imported
-    </h3>
-  `;
-  container.appendChild(heading);
+  layout.appendChild(left);
 
-  for (const source of sources) {
-    const card = _renderSourceCard(source);
-    container.appendChild(card);
+  // ── Right panel: schema viewer ──
+  const right = document.createElement('div');
+  right.className = 'sources-right';
+  right.id = 'schema-panel';
+
+  if (_selectedSourceId) {
+    const selectedSource = sources.find(s => s.id === _selectedSourceId) || sources[0];
+    if (selectedSource) {
+      _renderSchemaPanel(right, selectedSource);
+    }
+  } else if (sources.length > 0) {
+    _renderSchemaPanel(right, sources[0]);
+  } else {
+    right.innerHTML = '<div style="padding: 24px; color: var(--text-muted); text-align: center; font-size: 0.85rem;">Import a source to see its schema</div>';
   }
+
+  layout.appendChild(right);
+  container.appendChild(layout);
 }
 
 /**
- * Render a single source card.
+ * Render a source card in the grid.
  */
 function _renderSourceCard(source) {
-  const schema = source.schema_json ? JSON.parse(source.schema_json) : [];
-  const provenance = source.provenance_json ? JSON.parse(source.provenance_json) : {};
+  const card = document.createElement('div');
+  card.className = `source-card ${source.id === _selectedSourceId ? 'selected' : ''}`;
 
-  const card = html`
-    <div class="card given-row" style="cursor: pointer;">
-      <div class="card-header">
-        <span class="op-glyph existence"><i class="ph ph-file-text" style="font-size: 1rem;"></i></span>
-        <div style="flex: 1;">
-          <div class="card-title">${source.filename}</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            ${source.row_count} rows · ${source.column_count} columns
-            · ${new Date(source.ingested_at).toLocaleDateString()}
-          </div>
-        </div>
-        <span class="given-badge"><i class="ph ph-lock-simple" style="font-size: 0.65rem;"></i> Source</span>
-      </div>
-    </div>
-  `;
+  const name = document.createElement('div');
+  name.className = 'source-name';
+  name.textContent = source.filename;
 
-  card.addEventListener('click', () => _showSourceDetail(source));
+  const meta = document.createElement('div');
+  meta.className = 'source-meta';
+
+  const rowCol = document.createElement('span');
+  rowCol.textContent = `${source.row_count} rows \u00b7 ${source.column_count} columns`;
+  meta.appendChild(rowCol);
+
+  const date = document.createElement('span');
+  date.textContent = `Ingested ${new Date(source.ingested_at).toLocaleDateString()}`;
+  meta.appendChild(date);
+
+  if (source.sha256_hash) {
+    const sha = document.createElement('span');
+    sha.style.cssText = "font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;";
+    sha.textContent = `SHA-256: ${source.sha256_hash.substring(0, 8)}\u2026`;
+    meta.appendChild(sha);
+  }
+
+  card.appendChild(name);
+  card.appendChild(meta);
+
+  card.addEventListener('click', () => {
+    _selectedSourceId = source.id;
+    // Update selection UI
+    document.querySelectorAll('.source-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    // Update schema panel
+    const panel = document.getElementById('schema-panel');
+    if (panel) _renderSchemaPanel(panel, source);
+  });
+
   return card;
 }
 
 /**
- * Show detailed view of a source.
+ * Render the schema panel with tabs: Schema, Nulls, Preview.
  */
-async function _showSourceDetail(source) {
-  const content = document.createElement('div');
+function _renderSchemaPanel(panel, source) {
+  panel.innerHTML = '';
 
-  // Metadata section
-  const meta = html`
-    <div style="margin-bottom: 16px;">
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem;">
-        <div><strong>Filename:</strong> ${source.filename}</div>
-        <div><strong>Method:</strong> ${source.method || 'manual_upload'}</div>
-        <div><strong>SHA-256:</strong> <code style="font-size: 0.75rem;">${source.sha256_hash}</code></div>
-        <div><strong>Ingested:</strong> ${new Date(source.ingested_at).toLocaleString()}</div>
-        <div><strong>Rows:</strong> ${source.row_count}</div>
-        <div><strong>Columns:</strong> ${source.column_count}</div>
-      </div>
-      ${source.derived_from ? `<div style="margin-top: 8px; color: var(--meant-border);">Derived from: ${source.derived_from}</div>` : ''}
-    </div>
-  `;
-  content.appendChild(meta);
-
-  // Schema section
   const schema = source.schema_json ? JSON.parse(source.schema_json) : [];
-  if (schema.length > 0) {
-    const schemaSection = html`<div style="margin-bottom: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">Inferred Schema</h4></div>`;
-    const schemaTable = renderDataTable(
-      schema.map(s => ({
-        Column: s.name,
-        'Inferred Type': s.inferredType,
-        Confidence: `${Math.round(s.confidence * 100)}%`,
-        Override: s.override || '—',
-        Justification: s.overrideJustification || '—'
-      })),
-      ['Column', 'Inferred Type', 'Confidence', 'Override', 'Justification']
-    );
-    schemaSection.appendChild(schemaTable);
-    content.appendChild(schemaSection);
-  }
-
-  // NUL(∅) Audit section
   const provenance = source.provenance_json ? JSON.parse(source.provenance_json) : {};
-  if (provenance.nullAudit) {
-    const nullSection = html`<div style="margin-bottom: 16px;"><h4 style="font-size: 0.9rem; margin-bottom: 8px;">Null Value Audit</h4></div>`;
-    const nullRows = Object.entries(provenance.nullAudit).map(([col, counts]) => ({
-      Column: col,
-      Populated: counts.populated,
-      'Cleared': counts.CLEARED || 0,
-      'Unknown': counts.UNKNOWN || 0,
-      'Never Set': counts.NEVER_SET || 0
-    }));
-    const nullTable = renderDataTable(
-      nullRows,
-      ['Column', 'Populated', 'Cleared', 'Unknown', 'Never Set']
-    );
-    nullSection.appendChild(nullTable);
-    content.appendChild(nullSection);
+
+  let activeTab = 'schema';
+
+  // Tabs
+  const tabBar = document.createElement('div');
+  tabBar.className = 'schema-tabs';
+
+  const tabs = ['Schema', 'Nulls', 'Preview'];
+  for (const tabName of tabs) {
+    const btn = document.createElement('button');
+    btn.className = `schema-tab ${tabName.toLowerCase() === activeTab ? 'active' : ''}`;
+    btn.textContent = tabName;
+    btn.addEventListener('click', () => {
+      activeTab = tabName.toLowerCase();
+      tabBar.querySelectorAll('.schema-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      _renderTabContent(contentDiv, source, schema, provenance, activeTab);
+    });
+    tabBar.appendChild(btn);
+  }
+  panel.appendChild(tabBar);
+
+  // Content
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'schema-content';
+  _renderTabContent(contentDiv, source, schema, provenance, activeTab);
+  panel.appendChild(contentDiv);
+}
+
+function _renderTabContent(container, source, schema, provenance, tab) {
+  container.innerHTML = '';
+
+  if (tab === 'schema') {
+    _renderSchemaTab(container, schema, provenance);
+  } else if (tab === 'nulls') {
+    _renderNullsTab(container, provenance);
+  } else if (tab === 'preview') {
+    _renderPreviewTab(container, source, schema);
+  }
+}
+
+function _renderSchemaTab(container, schema, provenance) {
+  if (schema.length === 0) {
+    container.innerHTML = '<div style="color: var(--text-muted);">No schema available</div>';
+    return;
   }
 
-  // Data preview
-  const dataSection = html`<div><h4 style="font-size: 0.9rem; margin-bottom: 8px;">Data Preview</h4></div>`;
+  const nullAudit = provenance.nullAudit || {};
+
+  for (const field of schema) {
+    const row = document.createElement('div');
+    row.className = 'schema-field';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'field-name';
+    nameEl.textContent = field.name;
+
+    const typeEl = document.createElement('span');
+    typeEl.className = 'field-type';
+    typeEl.textContent = field.inferredType;
+
+    // Null percentage bar
+    const audit = nullAudit[field.name];
+    let nullPct = 0;
+    if (audit) {
+      const totalNulls = (audit.CLEARED || 0) + (audit.UNKNOWN || 0) + (audit.NEVER_SET || 0);
+      const total = audit.populated + totalNulls;
+      nullPct = total > 0 ? Math.round((totalNulls / total) * 100) : 0;
+    }
+
+    const barContainer = document.createElement('div');
+    barContainer.className = 'null-bar';
+    const bar = document.createElement('div');
+    bar.className = `null-bar-fill ${nullPct <= 5 ? 'green' : nullPct <= 20 ? 'amber' : 'red'}`;
+    bar.style.width = `${Math.min(nullPct, 100)}%`;
+    barContainer.appendChild(bar);
+
+    const pctEl = document.createElement('span');
+    pctEl.className = 'null-pct';
+    pctEl.textContent = `${nullPct}%`;
+
+    row.appendChild(nameEl);
+    row.appendChild(typeEl);
+    row.appendChild(barContainer);
+    row.appendChild(pctEl);
+    container.appendChild(row);
+  }
+}
+
+function _renderNullsTab(container, provenance) {
+  const nullAudit = provenance.nullAudit;
+  if (!nullAudit || Object.keys(nullAudit).length === 0) {
+    container.innerHTML = '<div style="color: var(--text-muted);">No null audit data available</div>';
+    return;
+  }
+
+  const rows = Object.entries(nullAudit).map(([col, counts]) => ({
+    Column: col,
+    Populated: counts.populated,
+    Cleared: counts.CLEARED || 0,
+    Unknown: counts.UNKNOWN || 0,
+    'Never Set': counts.NEVER_SET || 0
+  }));
+
+  const table = renderDataTable(rows, ['Column', 'Populated', 'Cleared', 'Unknown', 'Never Set']);
+  container.appendChild(table);
+}
+
+async function _renderPreviewTab(container, source, schema) {
+  container.innerHTML = '<div class="loading" style="min-height: 100px;"><div class="spinner"></div></div>';
 
   try {
     const data = await getSourceData(source);
+    container.innerHTML = '';
+
     const rows = Array.isArray(data) ? data : [];
-    const previewRows = rows.slice(0, 50);
+    const previewRows = rows.slice(0, 20);
     const headers = schema.map(s => s.name);
 
     if (previewRows.length > 0 && headers.length > 0) {
-      // Build null states map for display
-      const nullStatesMap = {};
-      const anchors = getAnchors(source.id);
-      for (const anchor of anchors.slice(0, 50)) {
-        if (anchor.null_states_json) {
-          nullStatesMap[anchor.row_index] = JSON.parse(anchor.null_states_json);
-        }
-      }
+      const table = renderMiniTable(previewRows, headers, 20);
+      container.appendChild(table);
 
-      const table = renderDataTable(previewRows, headers, { nullStates: nullStatesMap });
-      dataSection.appendChild(table);
-
-      if (rows.length > 50) {
-        const more = html`<div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-muted);">Showing 50 of ${rows.length} rows</div>`;
-        dataSection.appendChild(more);
+      if (rows.length > 20) {
+        const more = document.createElement('div');
+        more.style.cssText = 'font-size: 0.78rem; color: var(--text-muted); padding: 6px 0;';
+        more.textContent = `Showing 20 of ${rows.length} rows`;
+        container.appendChild(more);
       }
+    } else {
+      container.innerHTML = '<div style="color: var(--text-muted);">No data to preview</div>';
     }
   } catch (e) {
-    dataSection.appendChild(html`<div style="color: var(--text-muted);">Failed to load data preview</div>`);
+    container.innerHTML = '<div style="color: var(--text-muted);">Failed to load data preview</div>';
   }
-
-  content.appendChild(dataSection);
-
-  renderModal(source.filename, content, [
-    { label: 'Close', onClick: () => {} }
-  ]);
 }
 
 /**
@@ -231,7 +303,6 @@ function _showSchemaReview(result) {
       </p>
       <p style="font-size: 0.85rem; color: var(--text-secondary);">
         Review the inferred schema below. Override types if needed (e.g., FIPS codes should be strings, not numbers).
-        Overrides are logged as provenance events — they do not modify Given data.
       </p>
     </div>
   `);

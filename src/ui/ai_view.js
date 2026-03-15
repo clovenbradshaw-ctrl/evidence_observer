@@ -1,10 +1,9 @@
 /**
  * AI Analysis View — LLM-Powered EO Analysis
  *
- * Three tabs:
- *   1. Analyze — Run built-in or custom modules against Given-Log data
- *   2. Modules — Browse/manage analysis modules, import JSON instruction sets
- *   3. Settings — API key configuration
+ * Top bar: Source selector + module selector + run button (always visible).
+ * Results rendered as typed finding cards with severity.
+ * Module management moved to slide-out / secondary area.
  */
 
 import { OPERATORS, formatOperator, TRIAD_LABELS } from '../models/operators.js';
@@ -14,7 +13,8 @@ import { DEFAULT_MODULES, getModulesByTriad } from '../ai/modules.js';
 import { getCustomModules, importModules, deleteCustomModule, exportModules, generateModuleFromDescription } from '../ai/module_builder.js';
 import { callLLM, isAIConfigured } from '../ai/service.js';
 import { getProvider, setProvider, getAPIKey, setAPIKey, getModel, setModel } from '../ai/settings.js';
-import { renderDataTable, renderModal, html, toast } from './components.js';
+import { renderDataTable, renderModal, createOpBadge, getTriadClass, html, toast } from './components.js';
+import { updateTopBar } from '../app.js';
 
 let _activeTab = 'analyze';
 let _lastResult = null;
@@ -24,20 +24,7 @@ export function renderAIView(container) {
 
   const view = html`<div></div>`;
 
-  // Header
-  view.appendChild(html`
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-      <h2 style="font-size: 1.2rem;">
-        <span style="color: var(--accent);">⊡</span>
-        AI Analysis
-      </h2>
-      <div style="font-size: 0.8rem; color: var(--text-muted);">
-        ${isAIConfigured() ? `<span style="color: var(--completed-border);">● Connected</span> (${getProvider()})` : '<span style="color: var(--failed-border);">● Not configured</span>'}
-      </div>
-    </div>
-  `);
-
-  // Tabs
+  // Tabs — Analyze is primary, Modules and Settings are secondary
   const tabs = html`<div class="tabs"></div>`;
   for (const [key, label] of [['analyze', 'Analyze'], ['modules', 'Modules'], ['settings', 'Settings']]) {
     const tab = html`<button class="tab ${_activeTab === key ? 'active' : ''}">${label}</button>`;
@@ -51,23 +38,30 @@ export function renderAIView(container) {
 
   // Tab content
   const content = html`<div></div>`;
-  if (_activeTab === 'analyze') _renderAnalyzeTab(content);
-  else if (_activeTab === 'modules') _renderModulesTab(content, container);
-  else if (_activeTab === 'settings') _renderSettingsTab(content, container);
+  if (_activeTab === 'analyze') {
+    updateTopBar('AI Analysis', isAIConfigured() ? `Connected (${getProvider()})` : 'Not configured');
+    _renderAnalyzeTab(content);
+  } else if (_activeTab === 'modules') {
+    updateTopBar('AI Modules', `${DEFAULT_MODULES.length + getCustomModules().length} modules`);
+    _renderModulesTab(content, container);
+  } else if (_activeTab === 'settings') {
+    updateTopBar('AI Settings', getProvider());
+    _renderSettingsTab(content, container);
+  }
 
   view.appendChild(content);
   container.appendChild(view);
 }
 
 // ═══════════════════════════════════════════════
-// ANALYZE TAB
+// ANALYZE TAB — Finding cards layout
 // ═══════════════════════════════════════════════
 
 function _renderAnalyzeTab(container) {
   if (!isAIConfigured()) {
     container.appendChild(html`
       <div class="empty-state">
-        <div class="glyph">⊡</div>
+        <div class="glyph">\u22A1</div>
         <p>Configure your API key in the Settings tab to begin AI-powered analysis.</p>
       </div>
     `);
@@ -78,19 +72,22 @@ function _renderAnalyzeTab(container) {
   if (sources.length === 0) {
     container.appendChild(html`
       <div class="empty-state">
-        <div class="glyph">△</div>
+        <div class="glyph">\u25B3</div>
         <p>No data sources yet.<br>Import data in the Sources view first.</p>
       </div>
     `);
     return;
   }
 
+  // ── Controls bar: Source + Module + Run ──
+  const controls = document.createElement('div');
+  controls.className = 'ai-controls';
+
   // Source selector
-  const sourceGroup = html`
-    <div class="form-group">
-      <label class="form-label">Data Source</label>
-    </div>
-  `;
+  const sourceField = document.createElement('div');
+  sourceField.className = 'ai-field';
+  const sourceLabel = document.createElement('label');
+  sourceLabel.textContent = 'Source';
   const sourceSelect = document.createElement('select');
   sourceSelect.className = 'form-select';
   sourceSelect.id = 'ai-source-select';
@@ -100,15 +97,15 @@ function _renderAnalyzeTab(container) {
     opt.textContent = `${source.filename} (${source.row_count} rows)`;
     sourceSelect.appendChild(opt);
   }
-  sourceGroup.appendChild(sourceSelect);
-  container.appendChild(sourceGroup);
+  sourceField.appendChild(sourceLabel);
+  sourceField.appendChild(sourceSelect);
+  controls.appendChild(sourceField);
 
-  // Module selector — grouped by triad
-  const moduleGroup = html`
-    <div class="form-group">
-      <label class="form-label">Analysis Module</label>
-    </div>
-  `;
+  // Module selector
+  const moduleField = document.createElement('div');
+  moduleField.className = 'ai-field';
+  const moduleLabel = document.createElement('label');
+  moduleLabel.textContent = 'Module';
   const moduleSelect = document.createElement('select');
   moduleSelect.className = 'form-select';
   moduleSelect.id = 'ai-module-select';
@@ -136,74 +133,40 @@ function _renderAnalyzeTab(container) {
       const op = OPERATORS[mod.operatorType];
       const opt = document.createElement('option');
       opt.value = mod.id;
-      opt.textContent = `${op?.glyph || '?'} ${mod.name} (${op?.friendlyName || mod.operatorType}) [custom]`;
+      opt.textContent = `${op?.glyph || '?'} ${mod.name} [custom]`;
       customGroup.appendChild(opt);
     }
     moduleSelect.appendChild(customGroup);
   }
 
-  moduleSelect.addEventListener('change', () => _updateModuleDescription());
-  moduleGroup.appendChild(moduleSelect);
-  container.appendChild(moduleGroup);
-
-  // Module description display
-  const descBox = html`<div id="ai-module-desc" class="ai-module-desc"></div>`;
-  container.appendChild(descBox);
-
-  // Parameters
-  container.appendChild(html`
-    <div class="form-group">
-      <label class="form-label">Additional Parameters (optional)</label>
-      <textarea class="form-textarea" id="ai-params" rows="2" placeholder='e.g., {"focus": "district spending", "timeField": "date"}'></textarea>
-    </div>
-  `);
+  moduleField.appendChild(moduleLabel);
+  moduleField.appendChild(moduleSelect);
+  controls.appendChild(moduleField);
 
   // Run button
-  const runRow = html`<div style="display: flex; gap: 8px; margin-bottom: 16px;"></div>`;
-  const runBtn = html`<button class="btn btn-primary" id="ai-run-btn">Run Analysis</button>`;
+  const runBtn = document.createElement('button');
+  runBtn.className = 'btn btn-primary';
+  runBtn.id = 'ai-run-btn';
+  runBtn.textContent = 'Analyze';
   runBtn.addEventListener('click', () => _runAnalysis(container));
-  runRow.appendChild(runBtn);
-  container.appendChild(runRow);
+  controls.appendChild(runBtn);
+
+  container.appendChild(controls);
 
   // Results area
-  container.appendChild(html`<div id="ai-results"></div>`);
+  const resultsDiv = document.createElement('div');
+  resultsDiv.id = 'ai-results';
+  container.appendChild(resultsDiv);
 
   // Show last result if available
   if (_lastResult) {
-    _displayResult(_lastResult, document.getElementById('ai-results') || container);
-  }
-
-  // Init description
-  setTimeout(() => _updateModuleDescription(), 0);
-}
-
-function _updateModuleDescription() {
-  const descBox = document.getElementById('ai-module-desc');
-  const moduleSelect = document.getElementById('ai-module-select');
-  if (!descBox || !moduleSelect) return;
-
-  const moduleId = moduleSelect.value;
-  const allModules = [...DEFAULT_MODULES, ...getCustomModules()];
-  const mod = allModules.find(m => m.id === moduleId);
-
-  if (mod) {
-    const op = OPERATORS[mod.operatorType];
-    descBox.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-        <span class="op-glyph ${op.triad.toLowerCase()}" style="width:24px;height:24px;font-size:1rem;">${op.glyph}</span>
-        <strong>${mod.name}</strong>
-        <span class="meant-badge">${mod.operatorType}</span>
-        ${mod.custom ? '<span class="ai-custom-badge">custom</span>' : ''}
-      </div>
-      <div style="font-size: 0.85rem; color: var(--text-secondary);">${mod.description}</div>
-    `;
+    _displayResult(_lastResult, resultsDiv);
   }
 }
 
 async function _runAnalysis(container) {
   const sourceSelect = document.getElementById('ai-source-select');
   const moduleSelect = document.getElementById('ai-module-select');
-  const paramsInput = document.getElementById('ai-params');
   const runBtn = document.getElementById('ai-run-btn');
   const resultsDiv = document.getElementById('ai-results');
 
@@ -230,18 +193,6 @@ async function _runAnalysis(container) {
   const mod = allModules.find(m => m.id === moduleId);
   if (!mod) { toast('Module not found', 'error'); return; }
 
-  // Parse params
-  let params = {};
-  const paramsText = paramsInput?.value?.trim();
-  if (paramsText) {
-    try {
-      params = JSON.parse(paramsText);
-    } catch (e) {
-      toast('Invalid parameters JSON', 'error');
-      return;
-    }
-  }
-
   // Show loading
   runBtn.disabled = true;
   runBtn.textContent = 'Analyzing...';
@@ -254,8 +205,7 @@ async function _runAnalysis(container) {
 
   const startTime = performance.now();
 
-  // Build prompts and call LLM
-  const userPrompt = mod.buildUserPrompt(data, params);
+  const userPrompt = mod.buildUserPrompt(data, {});
   const result = await callLLM(mod.systemPrompt, userPrompt, { maxTokens: 4096, temperature: 0.2 });
 
   const runtime_ms = Math.round(performance.now() - startTime);
@@ -273,11 +223,9 @@ async function _runAnalysis(container) {
 
   _lastResult = analysisResult;
 
-  // Reset button
   runBtn.disabled = false;
-  runBtn.textContent = 'Run Analysis';
+  runBtn.textContent = 'Analyze';
 
-  // Display result
   _displayResult(analysisResult, resultsDiv);
 }
 
@@ -286,14 +234,12 @@ function _displayResult(result, container) {
 
   if (!result.success) {
     container.appendChild(html`
-      <div class="card" style="border-color: var(--failed-border);">
-        <div class="card-header">
-          <span class="op-glyph" style="border-color: var(--failed-border); color: var(--failed-border);">✗</span>
-          <div>
-            <div class="card-title">Analysis Failed</div>
-            <div style="font-size: 0.85rem; color: var(--failed-border);">${result.error}</div>
-          </div>
+      <div class="finding-card severity-high">
+        <div class="finding-header">
+          <span class="finding-title">Analysis Failed</span>
+          <span class="severity-badge high">Error</span>
         </div>
+        <div class="finding-body">${result.error}</div>
       </div>
     `);
     return;
@@ -301,114 +247,147 @@ function _displayResult(result, container) {
 
   const op = OPERATORS[result.operatorType];
 
-  // Result card
-  const card = html`
-    <div class="card ai-result-card">
-      <div class="card-header">
-        <span class="op-glyph ${op.triad.toLowerCase()}">${op.glyph}</span>
-        <div style="flex: 1;">
-          <div class="card-title">${op.glyph} ${result.moduleName} — ${result.sourceName}</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            ${result.rowCount} rows · ${result.runtime_ms}ms · ${result.model || getProvider()} · ${result.timestamp}
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Try to parse as JSON for structured display
+  // Try to parse as structured JSON
   let parsedJSON = null;
   try {
-    // Strip markdown code fences if present
     let cleaned = result.text.trim();
     if (cleaned.startsWith('```')) {
       cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
     parsedJSON = JSON.parse(cleaned);
   } catch (e) {
-    // Not JSON — display as text
+    // Not JSON
   }
 
   if (parsedJSON) {
-    // Structured JSON result
-    const jsonDisplay = html`<div class="ai-json-result"></div>`;
-    _renderJSONResult(jsonDisplay, parsedJSON);
-    card.appendChild(jsonDisplay);
+    // Render as finding cards
+    const findings = _extractFindings(parsedJSON, result.operatorType);
+
+    if (findings.length > 0) {
+      for (const finding of findings) {
+        container.appendChild(_renderFindingCard(finding, result.operatorType));
+      }
+    } else {
+      // Fallback: single finding card with the whole result
+      container.appendChild(_renderFindingCard({
+        title: `${op.glyph} ${result.moduleName} \u2014 ${result.sourceName}`,
+        description: typeof parsedJSON === 'string' ? parsedJSON : JSON.stringify(parsedJSON, null, 2),
+        severity: 'medium'
+      }, result.operatorType));
+    }
   } else {
-    // Plain text result
-    card.appendChild(html`<pre class="notation" style="margin-top: 12px;">${result.text}</pre>`);
+    // Plain text result as a single card
+    container.appendChild(_renderFindingCard({
+      title: `${op.glyph} ${result.moduleName} \u2014 ${result.sourceName}`,
+      description: result.text,
+      severity: 'medium'
+    }, result.operatorType));
   }
 
-  // Usage info
-  if (result.usage && Object.keys(result.usage).length > 0) {
-    card.appendChild(html`
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; text-align: right;">
-        Tokens: ${result.usage.input_tokens || result.usage.prompt_tokens || '?'} in / ${result.usage.output_tokens || result.usage.completion_tokens || '?'} out
-      </div>
-    `);
-  }
+  // Meta info
+  const metaDiv = document.createElement('div');
+  metaDiv.style.cssText = 'font-size: 0.72rem; color: var(--text-muted); margin-top: 8px; display: flex; gap: 16px; align-items: center;';
+  metaDiv.innerHTML = `
+    <span>${result.rowCount} rows \u00b7 ${result.runtime_ms}ms \u00b7 ${result.model || getProvider()}</span>
+  `;
 
-  // Copy raw button
-  const copyBtn = html`<button class="btn btn-sm" style="margin-top: 8px;">Copy Raw Response</button>`;
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-sm btn-ghost';
+  copyBtn.textContent = 'Copy raw';
   copyBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(result.text).then(() => toast('Copied to clipboard', 'success'));
+    navigator.clipboard.writeText(result.text).then(() => toast('Copied', 'success'));
   });
-  card.appendChild(copyBtn);
+  metaDiv.appendChild(copyBtn);
 
-  container.appendChild(card);
+  if (result.usage && Object.keys(result.usage).length > 0) {
+    const tokens = document.createElement('span');
+    tokens.textContent = `Tokens: ${result.usage.input_tokens || result.usage.prompt_tokens || '?'} in / ${result.usage.output_tokens || result.usage.completion_tokens || '?'} out`;
+    metaDiv.appendChild(tokens);
+  }
+
+  container.appendChild(metaDiv);
 }
 
-function _renderJSONResult(container, obj, depth = 0) {
-  if (depth > 3) {
-    container.appendChild(html`<pre class="notation">${JSON.stringify(obj, null, 2)}</pre>`);
-    return;
+function _extractFindings(json, operatorType) {
+  // Try to extract an array of findings from various JSON shapes
+  if (Array.isArray(json)) {
+    return json.map(item => _normalizeFind(item, operatorType));
   }
-
-  if (Array.isArray(obj)) {
-    for (let i = 0; i < obj.length; i++) {
-      const item = obj[i];
-      if (typeof item === 'object' && item !== null) {
-        const itemDiv = html`<div class="ai-json-item"></div>`;
-        _renderJSONResult(itemDiv, item, depth + 1);
-        container.appendChild(itemDiv);
-      } else {
-        container.appendChild(html`<div class="ai-json-value">${String(item)}</div>`);
-      }
-    }
-    return;
+  if (json.findings && Array.isArray(json.findings)) {
+    return json.findings.map(item => _normalizeFind(item, operatorType));
   }
-
-  if (typeof obj === 'object' && obj !== null) {
-    for (const [key, value] of Object.entries(obj)) {
-      const row = html`<div class="ai-json-row"></div>`;
-      const keyEl = html`<span class="ai-json-key">${key}:</span>`;
-      row.appendChild(keyEl);
-
-      if (Array.isArray(value)) {
-        if (value.length > 0 && typeof value[0] === 'object') {
-          container.appendChild(html`<div class="ai-json-key" style="margin-top: 8px;">${key}:</div>`);
-          const listDiv = html`<div style="margin-left: 16px;"></div>`;
-          _renderJSONResult(listDiv, value, depth + 1);
-          container.appendChild(listDiv);
-          continue;
-        } else {
-          const valEl = html`<span class="ai-json-value">${value.join(', ')}</span>`;
-          row.appendChild(valEl);
-        }
-      } else if (typeof value === 'object' && value !== null) {
-        container.appendChild(html`<div class="ai-json-key" style="margin-top: 8px;">${key}:</div>`);
-        const nestedDiv = html`<div style="margin-left: 16px;"></div>`;
-        _renderJSONResult(nestedDiv, value, depth + 1);
-        container.appendChild(nestedDiv);
-        continue;
-      } else {
-        const valEl = html`<span class="ai-json-value">${String(value)}</span>`;
-        row.appendChild(valEl);
-      }
-
-      container.appendChild(row);
-    }
+  if (json.results && Array.isArray(json.results)) {
+    return json.results.map(item => _normalizeFind(item, operatorType));
   }
+  if (json.analysis && Array.isArray(json.analysis)) {
+    return json.analysis.map(item => _normalizeFind(item, operatorType));
+  }
+  // Single object with a title/description
+  if (json.title || json.finding || json.description) {
+    return [_normalizeFind(json, operatorType)];
+  }
+  return [];
+}
+
+function _normalizeFind(item, operatorType) {
+  return {
+    title: item.title || item.finding || item.name || 'Finding',
+    description: item.description || item.detail || item.explanation || item.summary || JSON.stringify(item),
+    severity: item.severity || item.priority || _inferSeverity(item),
+    operatorType: item.operatorType || operatorType
+  };
+}
+
+function _inferSeverity(item) {
+  const text = JSON.stringify(item).toLowerCase();
+  if (text.includes('critical') || text.includes('high') || text.includes('urgent')) return 'high';
+  if (text.includes('warning') || text.includes('medium') || text.includes('moderate')) return 'medium';
+  return 'low';
+}
+
+function _renderFindingCard(finding, defaultOpType) {
+  const opType = finding.operatorType || defaultOpType;
+  const severity = (finding.severity || 'medium').toLowerCase();
+
+  const card = document.createElement('div');
+  card.className = `finding-card severity-${severity}`;
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'finding-header';
+
+  const badge = createOpBadge(opType);
+  badge.style.fontSize = '0.68rem';
+  header.appendChild(badge);
+
+  const title = document.createElement('span');
+  title.className = 'finding-title';
+  title.textContent = finding.title;
+  header.appendChild(title);
+
+  const sevBadge = document.createElement('span');
+  sevBadge.className = `severity-badge ${severity}`;
+  sevBadge.textContent = severity;
+  header.appendChild(sevBadge);
+
+  card.appendChild(header);
+
+  // Body
+  const body = document.createElement('div');
+  body.className = 'finding-body';
+  body.textContent = finding.description;
+  card.appendChild(body);
+
+  // Save to session link
+  const saveLink = document.createElement('div');
+  saveLink.className = 'save-to-session';
+  saveLink.textContent = `\u2192 Save to session as ${opType} step`;
+  saveLink.addEventListener('click', () => {
+    toast(`Saved finding as ${opType} step (select a session in Workbook to attach)`, 'info');
+  });
+  card.appendChild(saveLink);
+
+  return card;
 }
 
 // ═══════════════════════════════════════════════
@@ -416,7 +395,6 @@ function _renderJSONResult(container, obj, depth = 0) {
 // ═══════════════════════════════════════════════
 
 function _renderModulesTab(container, viewContainer) {
-  // Built-in modules
   const byTriad = getModulesByTriad();
 
   for (const [triad, modules] of Object.entries(byTriad)) {
@@ -467,7 +445,6 @@ function _renderModulesTab(container, viewContainer) {
           </div>
         </div>
       `;
-      // Delete on right-click or with a delete button
       const delBtn = html`<button class="btn btn-sm" style="color: var(--failed-border); margin-left: 8px;">Delete</button>`;
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -486,10 +463,9 @@ function _renderModulesTab(container, viewContainer) {
     `);
   }
 
-  // Import / Export / Generate section
+  // Import section
   container.appendChild(html`<hr style="border-color: var(--border-subtle); margin: 20px 0;">`);
 
-  // JSON Import
   container.appendChild(html`
     <div class="form-group">
       <label class="form-label">Import JSON Instruction Set</label>
@@ -499,8 +475,8 @@ function _renderModulesTab(container, viewContainer) {
     "name": "My Custom Analysis",
     "operatorType": "SEG",
     "description": "What this module does",
-    "systemPrompt": "You are an analyst. Analyze the data and...",
-    "userPromptTemplate": "Analyze this dataset ({{rowCount}} rows, fields: {{fieldNames}}):\n\n{{data}}"
+    "systemPrompt": "You are an analyst...",
+    "userPromptTemplate": "Analyze this dataset..."
   }]
 }'></textarea>
     </div>
@@ -536,13 +512,12 @@ function _renderModulesTab(container, viewContainer) {
     container.appendChild(html`
       <div class="form-group">
         <label class="form-label">Generate Module with AI</label>
-        <textarea class="form-textarea" id="ai-gen-desc" rows="3" placeholder="Describe the analysis you want, e.g.: 'Analyze campaign finance data for potential conflicts of interest by cross-referencing donor organizations with committee voting records'"></textarea>
+        <textarea class="form-textarea" id="ai-gen-desc" rows="3" placeholder="Describe the analysis you want..."></textarea>
       </div>
     `);
 
     const genRow = html`<div style="display: flex; gap: 8px; align-items: center;"></div>`;
 
-    // Operator type hint
     const opSelect = document.createElement('select');
     opSelect.className = 'form-select';
     opSelect.id = 'ai-gen-op';
@@ -574,7 +549,6 @@ function _renderModulesTab(container, viewContainer) {
       genBtn.textContent = 'Generate Module';
 
       if (result.success) {
-        // Save the generated module
         const { imported } = importModules(JSON.stringify({ modules: [{
           id: result.module.id,
           name: result.module.name,
@@ -605,7 +579,7 @@ function _renderSettingsTab(container, viewContainer) {
     <div style="max-width: 600px;">
       <div class="card" style="margin-top: 16px;">
         <div class="card-header" style="margin-bottom: 0;">
-          <span class="op-glyph" style="border-color: var(--accent); color: var(--accent); width:28px; height:28px; font-size:1rem;">⊡</span>
+          <span class="op-glyph" style="border-color: var(--accent); color: var(--accent); width:28px; height:28px; font-size:1rem;">\u22A1</span>
           <div class="card-title">API Configuration</div>
         </div>
       </div>
@@ -657,7 +631,7 @@ function _renderSettingsTab(container, viewContainer) {
 
   container.appendChild(html`
     <div style="font-size: 0.8rem; color: var(--text-muted); max-width: 600px; margin-bottom: 16px;">
-      Your API key is stored in localStorage and sent only to ${currentProvider === 'anthropic' ? 'api.anthropic.com' : 'api.openai.com'}. It never leaves your browser otherwise.
+      Your API key is stored in localStorage and sent only to ${currentProvider === 'anthropic' ? 'api.anthropic.com' : 'api.openai.com'}.
     </div>
   `);
 
