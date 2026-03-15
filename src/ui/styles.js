@@ -69,7 +69,10 @@ code, .code-editor, .notation {
 #app {
   display: flex;
   flex-direction: row;
+  align-items: stretch;
+  justify-content: flex-start;
   height: 100vh;
+  min-height: 0;
   overflow: hidden;
 }
 
