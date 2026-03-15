@@ -16,6 +16,7 @@ import { NullState } from './operators.js';
  * Mints an immutable anchor for the ingested source.
  */
 export function ins_createSource({
+  id: presetId = null,
   filename,
   sha256Hash,
   sourceUrl = null,
@@ -30,7 +31,7 @@ export function ins_createSource({
   provenanceJson = null,
   derivedFrom = null
 }) {
-  const id = uuid();
+  const id = presetId || uuid();
   const ingestedAt = now();
 
   run(

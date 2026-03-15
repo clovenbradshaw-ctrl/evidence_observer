@@ -8,10 +8,11 @@
  * Corrected versions create new Given-Log entries with derived_from pointers.
  */
 
-import { persistToIndexedDB, storeBlob, getBlob } from '../db.js';
+import { persistToIndexedDB, storeBlob, getBlob, uuid } from '../db.js';
 import { ins_createSource, ins_createAnchor, hashExists } from '../models/given_log.js';
 import { sig_parseFile, sig_inferSchema } from './parser.js';
 import { nul_nullifyRow, nul_audit } from './nul.js';
+import { createIngestionEvent } from '../models/ingestion_events.js';
 
 /**
  * SHA-256 hash a string using the Web Crypto API.
@@ -49,6 +50,9 @@ async function hashRow(rowData) {
  * @returns {Promise<Object>} Ingestion result
  */
 export async function ins_ingest(file, options = {}) {
+  // Pre-generate source ID so we can log events from the start
+  const sourceId = uuid();
+
   // Step 1: Read file content
   let content, filename;
   if (file instanceof File) {
@@ -59,12 +63,25 @@ export async function ins_ingest(file, options = {}) {
     filename = file.name;
   }
 
+  // Audit: upload started
+  createIngestionEvent(sourceId, 'upload_started', {
+    filename,
+    size: content.length,
+    method: options.method || 'manual_upload',
+    analystId: options.analystId || null,
+    derivedFrom: options.derivedFrom || null
+  });
+
   // Step 2: SHA-256 hash
   const hash = await sha256(content);
+
+  // Audit: hash computed
+  createIngestionEvent(sourceId, 'hash_computed', { hash });
 
   // Check for duplicate
   const existingId = hashExists(hash);
   if (existingId && !options.derivedFrom) {
+    createIngestionEvent(sourceId, 'duplicate_detected', { existingId, hash });
     return {
       status: 'duplicate',
       existingId,
@@ -78,10 +95,18 @@ export async function ins_ingest(file, options = {}) {
   try {
     ({ headers, rows, format } = sig_parseFile(filename, content));
   } catch (parseErr) {
+    createIngestionEvent(sourceId, 'ingestion_failed', {
+      error: `Parse error: ${parseErr.message}`,
+      stage: 'SIG'
+    });
     throw new Error(`Could not parse file: ${parseErr.message}`);
   }
 
   if (!rows || rows.length === 0) {
+    createIngestionEvent(sourceId, 'ingestion_failed', {
+      error: 'No data rows found in file',
+      stage: 'SIG'
+    });
     throw new Error('No data rows found in file');
   }
 
@@ -98,8 +123,36 @@ export async function ins_ingest(file, options = {}) {
     }
   }
 
+  // Audit: SIG parse complete
+  createIngestionEvent(sourceId, 'sig_parse_complete', {
+    format,
+    headerCount: headers.length,
+    rowCount: rows.length,
+    overrideCount: options.schemaOverrides?.length || 0
+  });
+
   // Step 4: NUL(∅) — Detect null states across all rows
   const nullAudit = nul_audit(rows, headers);
+
+  // Summarize null audit for the event
+  let totalCleared = 0, totalUnknown = 0, totalNeverSet = 0, columnsWithNulls = 0;
+  for (const [, counts] of Object.entries(nullAudit)) {
+    const c = counts.CLEARED || 0;
+    const u = counts.UNKNOWN || 0;
+    const n = counts.NEVER_SET || 0;
+    totalCleared += c;
+    totalUnknown += u;
+    totalNeverSet += n;
+    if (c > 0 || u > 0 || n > 0) columnsWithNulls++;
+  }
+
+  // Audit: NUL audit complete
+  createIngestionEvent(sourceId, 'nul_audit_complete', {
+    columnsWithNulls,
+    totalCleared,
+    totalUnknown,
+    totalNeverSet
+  });
 
   // Step 5: Determine storage strategy
   const DATA_SIZE_THRESHOLD = 1024 * 1024; // 1MB
@@ -113,6 +166,12 @@ export async function ins_ingest(file, options = {}) {
     dataJson = rows;
   }
 
+  // Audit: storage decision
+  createIngestionEvent(sourceId, 'storage_decided', {
+    strategy: isLargeDataset ? 'blob' : 'inline',
+    contentSize: content.length
+  });
+
   // Step 6: INS(△) — Create Given-Log entry
   const provenance = {
     format,
@@ -125,7 +184,8 @@ export async function ins_ingest(file, options = {}) {
     ...(options.method && { method: options.method })
   };
 
-  const { id: sourceId, ingestedAt } = ins_createSource({
+  const { id: createdId, ingestedAt } = ins_createSource({
+    id: sourceId,
     filename,
     sha256Hash: hash,
     sourceUrl: options.sourceUrl,
@@ -139,6 +199,12 @@ export async function ins_ingest(file, options = {}) {
     dataJson,
     provenanceJson: provenance,
     derivedFrom: options.derivedFrom
+  });
+
+  // Audit: source created
+  createIngestionEvent(sourceId, 'source_created', {
+    sourceId,
+    ingestedAt
   });
 
   // Store large data in IndexedDB if needed
@@ -162,6 +228,20 @@ export async function ins_ingest(file, options = {}) {
     });
     anchorIds.push(anchorId);
   }
+
+  // Audit: anchors created
+  createIngestionEvent(sourceId, 'anchors_created', {
+    anchorCount: anchorIds.length
+  });
+
+  // Audit: ingestion complete
+  createIngestionEvent(sourceId, 'ingestion_complete', {
+    sourceId,
+    rowCount: rows.length,
+    columnCount: headers.length,
+    anchorCount: anchorIds.length,
+    hash
+  });
 
   // Persist to IndexedDB
   await persistToIndexedDB();
