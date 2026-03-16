@@ -745,28 +745,65 @@ async function _rerunStep(stepId, sessionId, viewContainer) {
 }
 
 async function _runAll(chain, sessionId, viewContainer) {
+  const pending = chain.filter(s => s.status !== 'completed');
+  if (pending.length === 0) {
+    toast('All steps already completed', 'info');
+    return;
+  }
+
+  toast(`Running ${pending.length} step${pending.length !== 1 ? 's' : ''}...`, 'info');
+  let executed = 0;
+
   for (const step of chain) {
     if (step.status !== 'completed') {
       try {
-        await executeStep(step.id);
+        const result = await executeStep(step.id);
+        if (result.success) {
+          executed++;
+        } else {
+          toast(`Step ${step.sequence_number} failed: ${result.error}`, 'error');
+          break;
+        }
       } catch (e) {
         toast(`Step ${step.sequence_number} failed: ${e.message}`, 'error');
         break;
       }
     }
   }
+
+  if (executed > 0) {
+    toast(`Completed ${executed} step${executed !== 1 ? 's' : ''}`, 'success');
+  }
   _renderActiveSession(viewContainer, sessionId);
 }
 
 async function _runAllStale(chain, sessionId, viewContainer) {
+  const stale = chain.filter(s => s.status === 'stale');
+  if (stale.length === 0) {
+    toast('No stale steps to run', 'info');
+    return;
+  }
+
+  toast(`Running ${stale.length} stale step${stale.length !== 1 ? 's' : ''}...`, 'info');
+  let executed = 0;
+
   for (const step of chain) {
     if (step.status === 'stale') {
       try {
-        await executeStep(step.id);
+        const result = await executeStep(step.id);
+        if (result.success) {
+          executed++;
+        } else {
+          toast(`Step ${step.sequence_number} failed: ${result.error}`, 'error');
+        }
       } catch (e) {
         toast(`Step ${step.sequence_number} failed: ${e.message}`, 'error');
       }
     }
+  }
+
+  if (executed > 0) {
+    toast(`Completed ${executed} stale step${executed !== 1 ? 's' : ''}`, 'success');
   }
   _renderActiveSession(viewContainer, sessionId);
 }

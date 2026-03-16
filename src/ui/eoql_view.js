@@ -13,7 +13,7 @@ import { acSuggest, acIconClass } from '../eoql/autocomplete.js';
 import { OPERATOR_STACKS, STACK_CATEGORIES, getStack, getStackInputs, searchStacks } from '../eoql/operator_stacks.js';
 import { OPERATORS } from '../models/operators.js';
 import { getAllSources } from '../models/given_log.js';
-import { getSourceData } from '../given/service.js';
+import { getSourceData, ins_ingest } from '../given/service.js';
 import { renderMiniTable, renderDataTable, html, toast } from './components.js';
 import { updateTopBar } from '../app.js';
 
@@ -333,6 +333,11 @@ async function _executeCommand(raw, viewContainer) {
     if (ast.op === 'INS' && result.meta?.name) {
       _sources[result.meta.name] = result.result;
       _sourceFields[result.meta.name] = result.result.length > 0 ? Object.keys(result.result[0]) : [];
+
+      // Persist as a derived source in the Given-Log with full history
+      if (result.meta.isDerived) {
+        _persistDerivedSource(result.meta.name, result.result, result.meta, raw);
+      }
     }
 
     _history.push({ raw, op: ast.op, summary: result.summary, timestamp: new Date().toISOString() });
@@ -398,6 +403,11 @@ async function _executeStack(stackId, params, viewContainer) {
       if (result.meta?.name) {
         _sources[result.meta.name] = result.result;
         _sourceFields[result.meta.name] = result.result.length > 0 ? Object.keys(result.result[0]) : [];
+
+        // Persist as a derived source in the Given-Log with full history
+        if (result.meta.isDerived) {
+          _persistDerivedSource(result.meta.name, result.result, result.meta, resolvedCmd);
+        }
       }
 
       _history.push({ raw: resolvedCmd, op: ast.op, summary: result.summary, timestamp: new Date().toISOString() });
@@ -786,6 +796,63 @@ async function _loadAllSources() {
     } catch (e) {
       console.warn(`Failed to load source ${source.filename}:`, e);
     }
+  }
+}
+
+// ─── Derived Source Persistence ──────────────────────────────────
+
+/**
+ * Persist an EOQL INS result as a derived source in the Given-Log.
+ * Carries full derivation history (EOQL commands that produced it)
+ * and links back to the original source(s) via derived_from.
+ */
+async function _persistDerivedSource(name, data, meta, rawCommand) {
+  if (!data || data.length === 0) return;
+
+  try {
+    // Find the original source ID if we can match by name
+    const allSources = getAllSources();
+    const parentSourceNames = meta.derivedFromSources || [];
+    const parentSource = parentSourceNames.length > 0
+      ? allSources.find(s => {
+          const sName = s.filename.replace(/\.[^.]+$/, '');
+          return parentSourceNames.includes(sName);
+        })
+      : null;
+
+    // Build the CSV content from the data for proper ingestion
+    const headers = Object.keys(data[0]);
+    const csvRows = [headers.join(',')];
+    for (const row of data) {
+      const vals = headers.map(h => {
+        const v = row[h];
+        if (v === null || v === undefined) return '';
+        const s = String(v);
+        return s.includes(',') || s.includes('"') || s.includes('\n')
+          ? `"${s.replace(/"/g, '""')}"`
+          : s;
+      });
+      csvRows.push(vals.join(','));
+    }
+    const csvContent = csvRows.join('\n');
+
+    const filename = `${name}.csv`;
+
+    const result = await ins_ingest(
+      { name: filename, content: csvContent },
+      {
+        method: 'api',
+        sourceDescription: `Derived source from EOQL: ${rawCommand}`,
+        derivedFrom: parentSource?.id || null
+      }
+    );
+
+    if (result.status === 'ingested') {
+      toast(`Saved "${name}" as derived source (${result.rowCount} rows)`, 'success');
+    }
+  } catch (err) {
+    // Don't block the EOQL workflow if persistence fails
+    console.warn(`[eoql] Failed to persist derived source "${name}":`, err);
   }
 }
 
